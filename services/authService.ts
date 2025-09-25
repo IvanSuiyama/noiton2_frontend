@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE = 'http://192.168.15.15:3000';
+const API_BASE = 'http://10.241.191.119:3000';
 const TOKEN_KEY = 'auth_token';
 const EMAIL_KEY = 'user_email';
 const USER_ID_KEY = 'user_id';
+const ACTIVE_WORKSPACE_KEY = 'active_workspace_id';
+const ACTIVE_WORKSPACE_NAME_KEY = 'active_workspace_name';
 
 // =====================================================
 // 1️⃣ FUNÇÃO DE LOGIN (OBTER TOKEN)
@@ -73,12 +75,13 @@ export const getUserEmail = async (): Promise<string | null> => {
 };
 
 // =====================================================
-// 5️⃣ FUNÇÃO PARA REQUISIÇÕES AUTENTICADAS
+// 5️⃣ FUNÇÃO PARA REQUISIÇÕES AUTENTICADAS (Atualizada para incluir workspace)
 // =====================================================
 export const apiCall = async (
   endpoint: string,
   method = 'GET',
   body: any = null,
+  includeWorkspace = false,
 ) => {
   const token = await getToken();
 
@@ -86,12 +89,22 @@ export const apiCall = async (
     throw new Error('Token não encontrado. Faça login novamente.');
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+
+  // Incluir workspace ID no header se necessário
+  if (includeWorkspace) {
+    const workspaceId = await getActiveWorkspaceId();
+    if (workspaceId) {
+      headers['X-Workspace-ID'] = workspaceId.toString();
+    }
+  }
+
   const config: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
   };
 
   if (body) {
@@ -138,11 +151,17 @@ export const isAuthenticated = async (): Promise<boolean> => {
 };
 
 // =====================================================
-// 7️⃣ LOGOUT (LIMPAR TOKEN)
+// 7️⃣ LOGOUT (LIMPAR TOKEN E WORKSPACE)
 // =====================================================
 export const logout = async (): Promise<void> => {
   try {
-    await AsyncStorage.multiRemove([TOKEN_KEY, EMAIL_KEY, USER_ID_KEY]);
+    await AsyncStorage.multiRemove([
+      TOKEN_KEY, 
+      EMAIL_KEY, 
+      USER_ID_KEY, 
+      ACTIVE_WORKSPACE_KEY, 
+      ACTIVE_WORKSPACE_NAME_KEY
+    ]);
   } catch (error) {
     console.error('Erro ao fazer logout:', error);
   }
@@ -193,4 +212,171 @@ export const checkAuthStatus = async () => {
   }
 
   return true;
+};
+
+// =====================================================
+// 🏠 GERENCIAMENTO DE WORKSPACE ATIVO
+// =====================================================
+
+// Salvar workspace ativo
+export const setActiveWorkspace = async (workspaceId: number, workspaceName: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaceId.toString());
+    await AsyncStorage.setItem(ACTIVE_WORKSPACE_NAME_KEY, workspaceName);
+  } catch (error) {
+    console.error('Erro ao salvar workspace ativo:', error);
+  }
+};
+
+// Obter ID do workspace ativo
+export const getActiveWorkspaceId = async (): Promise<number | null> => {
+  try {
+    const workspaceId = await AsyncStorage.getItem(ACTIVE_WORKSPACE_KEY);
+    return workspaceId ? parseInt(workspaceId, 10) : null;
+  } catch (error) {
+    console.error('Erro ao obter workspace ativo:', error);
+    return null;
+  }
+};
+
+// Obter nome do workspace ativo
+export const getActiveWorkspaceName = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(ACTIVE_WORKSPACE_NAME_KEY);
+  } catch (error) {
+    console.error('Erro ao obter nome do workspace ativo:', error);
+    return null;
+  }
+};
+
+// Limpar workspace ativo
+export const clearActiveWorkspace = async (): Promise<void> => {
+  try {
+    await AsyncStorage.multiRemove([ACTIVE_WORKSPACE_KEY, ACTIVE_WORKSPACE_NAME_KEY]);
+  } catch (error) {
+    console.error('Erro ao limpar workspace ativo:', error);
+  }
+};
+
+// =====================================================
+// 🏠 VERIFICAR SE USUÁRIO TEM WORKSPACE (Rota correta do backend)
+// =====================================================
+export const getUserWorkspaces = async () => {
+  try {
+    const email = await getUserEmail();
+    if (!email) {
+      throw new Error('Usuário não autenticado');
+    }
+
+    const response = await apiCall(`/workspaces/email/${encodeURIComponent(email)}`, 'GET');
+    return response;
+  } catch (error) {
+    console.error('Erro ao buscar workspaces do usuário:', error);
+    throw error;
+  }
+};
+
+export const hasUserWorkspaces = async (): Promise<boolean> => {
+  try {
+    const workspaces = await getUserWorkspaces();
+    return workspaces && workspaces.length > 0;
+  } catch (error) {
+    console.error('Erro ao verificar workspaces:', error);
+    return false;
+  }
+};
+
+// Função para configurar workspace ativo após login
+export const setupActiveWorkspace = async (): Promise<{hasWorkspace: boolean, workspace?: any}> => {
+  try {
+    const workspaces = await getUserWorkspaces();
+    
+    if (workspaces && workspaces.length > 0) {
+      // Se tem workspaces, define o primeiro como ativo
+      const firstWorkspace = workspaces[0];
+      await setActiveWorkspace(firstWorkspace.id_workspace, firstWorkspace.nome);
+      
+      return {
+        hasWorkspace: true,
+        workspace: firstWorkspace
+      };
+    }
+    
+    return {hasWorkspace: false};
+  } catch (error) {
+    console.error('Erro ao configurar workspace ativo:', error);
+    return {hasWorkspace: false};
+  }
+};
+
+// =====================================================
+// 🔟 FUNÇÕES PARA COMENTÁRIOS
+// =====================================================
+
+// Criar comentário em uma tarefa
+export const criarComentario = async (id_tarefa: number, conteudo: string) => {
+  try {
+    const email = await getUserEmail();
+    if (!email) {
+      throw new Error('Usuário não autenticado');
+    }
+
+    const response = await apiCall('/comentarios', 'POST', {
+      id_tarefa,
+      conteudo,
+      email_autor: email,
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Erro ao criar comentário:', error);
+    throw error;
+  }
+};
+
+// Buscar comentários de uma tarefa
+export const buscarComentariosPorTarefa = async (id_tarefa: number) => {
+  try {
+    const response = await apiCall(`/comentarios/tarefa/${id_tarefa}`, 'GET');
+    return response;
+  } catch (error) {
+    console.error('Erro ao buscar comentários:', error);
+    throw error;
+  }
+};
+
+// Atualizar comentário (apenas o autor pode atualizar)
+export const atualizarComentario = async (id_comentario: number, conteudo: string) => {
+  try {
+    const response = await apiCall(`/comentarios/${id_comentario}`, 'PUT', {
+      conteudo,
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Erro ao atualizar comentário:', error);
+    throw error;
+  }
+};
+
+// Deletar comentário (apenas o autor pode deletar)
+export const deletarComentario = async (id_comentario: number) => {
+  try {
+    const response = await apiCall(`/comentarios/${id_comentario}`, 'DELETE');
+    return response;
+  } catch (error) {
+    console.error('Erro ao deletar comentário:', error);
+    throw error;
+  }
+};
+
+// Buscar comentários por autor
+export const buscarComentariosPorAutor = async (email_autor: string) => {
+  try {
+    const response = await apiCall(`/comentarios/autor/${encodeURIComponent(email_autor)}`, 'GET');
+    return response;
+  } catch (error) {
+    console.error('Erro ao buscar comentários por autor:', error);
+    throw error;
+  }
 };

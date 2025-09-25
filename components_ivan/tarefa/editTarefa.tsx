@@ -13,12 +13,33 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import {CriarTarefaInterface} from './tarefaMultiplaInterface';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {RouteProp} from '@react-navigation/native';
+import {RootStackParamList} from '../router';
 import CategoriaInterface from '../categoria/categoriaInterface';
-import {apiCall} from '../../services/authService';
+import {apiCall, getActiveWorkspaceId} from '../../services/authService';
 
-// Tipo baseado na CriarTarefaInterface
-type FormData = CriarTarefaInterface;
+type EditTarefaNavigationProp = StackNavigationProp<RootStackParamList>;
+type EditTarefaRouteProp = RouteProp<RootStackParamList, 'EditTarefa'>;
+
+interface EditTarefaProps {
+  navigation: EditTarefaNavigationProp;
+  route: EditTarefaRouteProp;
+}
+
+interface TarefaData {
+  id_tarefa: number;
+  titulo: string;
+  descricao: string;
+  data_fim: string;
+  status: 'a_fazer' | 'em_andamento' | 'concluido' | 'atrasada';
+  prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
+  recorrente: boolean;
+  recorrencia?: 'diaria' | 'semanal' | 'mensal';
+  id_workspace: number;
+  responsaveis: string[];
+  categorias_selecionadas: number[]; // Array de IDs das categorias (relacionamento via tarefa_categoria)
+}
 
 // Opções para os seletores
 const PRIORIDADES = [
@@ -41,8 +62,11 @@ const FREQUENCIAS = [
   {label: 'Mensal', value: 'mensal'},
 ];
 
-const CadTarefa: React.FC = () => {
-  const [formData, setFormData] = useState<FormData>({
+const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
+  const {id_tarefa} = route.params;
+  
+  const [formData, setFormData] = useState<TarefaData>({
+    id_tarefa: 0,
     titulo: '',
     descricao: '',
     data_fim: '',
@@ -50,19 +74,19 @@ const CadTarefa: React.FC = () => {
     prioridade: 'media',
     recorrente: false,
     recorrencia: undefined,
-    id_workspace: 1, // TODO: Obter do contexto/parâmetro de navegação
-    id_usuario: 1, // TODO: Obter do contexto do usuário logado
-    responsaveis: [], // TODO: Implementar seleção de responsáveis
+    id_workspace: 0,
+    responsaveis: [],
     categorias_selecionadas: [],
   });
+  const [tarefaOriginal, setTarefaOriginal] = useState<TarefaData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingTarefa, setLoadingTarefa] = useState<boolean>(true);
   const [errors, setErrors] = useState<
-    Partial<Pick<FormData, 'titulo' | 'data_fim'>>
+    Partial<Pick<TarefaData, 'titulo' | 'data_fim'>>
   >({});
   const [categoriasDisponiveis, setCategoriasDisponiveis] = useState<
     CategoriaInterface[]
   >([]);
-  const [workspaceAtual, setWorkspaceAtual] = useState<number>(1);
 
   // Estados para modals dos seletores
   const [modalPrioridade, setModalPrioridade] = useState<boolean>(false);
@@ -70,26 +94,77 @@ const CadTarefa: React.FC = () => {
   const [modalCategoria, setModalCategoria] = useState<boolean>(false);
   const [modalFrequencia, setModalFrequencia] = useState<boolean>(false);
 
-  // Obter categorias do workspace ao inicializar o componente
+  // Carregar dados da tarefa ao inicializar
   useEffect(() => {
-    const carregarCategorias = async () => {
-      try {
-        const categorias = await apiCall(
-          `/categorias/workspace/${workspaceAtual}`,
-          'GET',
-        );
-        setCategoriasDisponiveis(categorias);
-      } catch (error) {
-        console.error('Erro ao carregar categorias:', error);
-      }
-    };
+    carregarDadosTarefa();
+  }, []);
 
-    carregarCategorias();
-  }, [workspaceAtual]);
+  // Função para carregar dados do usuário logado
+
+
+  // Carregar categorias quando workspace for definido
+  useEffect(() => {
+    if (formData.id_workspace) {
+      carregarCategorias();
+    }
+  }, [formData.id_workspace]);
+
+  const carregarDadosTarefa = async () => {
+    setLoadingTarefa(true);
+    try {
+      const tarefa = await apiCall(`/tarefas/${id_tarefa}`, 'GET');
+      
+      // Buscar categorias associadas à tarefa
+      let categoriasTarefa = [];
+      try {
+        const categoriasResponse = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
+        categoriasTarefa = categoriasResponse.map((cat: any) => cat.id_categoria);
+      } catch (error) {
+        console.log('Nenhuma categoria encontrada para a tarefa:', error);
+      }
+      
+      const tarefaFormatada: TarefaData = {
+        id_tarefa: tarefa.id_tarefa,
+        titulo: tarefa.titulo || '',
+        descricao: tarefa.descricao || '',
+        data_fim: tarefa.data_fim || '',
+        status: tarefa.status || 'a_fazer',
+        prioridade: tarefa.prioridade || 'media',
+        recorrente: tarefa.recorrente || false,
+        recorrencia: tarefa.recorrencia,
+        id_workspace: tarefa.id_workspace,
+        responsaveis: tarefa.responsaveis || [],
+        categorias_selecionadas: categoriasTarefa,
+      };
+
+      setFormData(tarefaFormatada);
+      setTarefaOriginal(tarefaFormatada);
+    } catch (error) {
+      console.error('Erro ao carregar dados da tarefa:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados da tarefa', [
+        {text: 'OK', onPress: () => navigation.goBack()},
+      ]);
+    } finally {
+      setLoadingTarefa(false);
+    }
+  };
+
+  const carregarCategorias = async () => {
+    try {
+      const categorias = await apiCall(
+        `/categorias/workspace/${formData.id_workspace}`,
+        'GET',
+      );
+      setCategoriasDisponiveis(categorias);
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+      // Usar categorias mockadas em caso de erro
+    }
+  };
 
   // Função para validar formulário
   const validarFormulario = (): boolean => {
-    const newErrors: Partial<Pick<FormData, 'titulo' | 'data_fim'>> = {};
+    const newErrors: Partial<Pick<TarefaData, 'titulo' | 'data_fim'>> = {};
 
     if (!formData.titulo.trim()) {
       newErrors.titulo = 'Título é obrigatório';
@@ -99,11 +174,10 @@ const CadTarefa: React.FC = () => {
     if (formData.data_fim) {
       const dataFim = new Date(formData.data_fim);
       const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0); // Zerar horas para comparação apenas da data
+      hoje.setHours(0, 0, 0, 0);
 
       if (dataFim < hoje) {
-        newErrors.data_fim =
-          'Data de expiração não pode ser anterior à hoje';
+        newErrors.data_fim = 'Data de expiração não pode ser anterior à hoje';
       }
     }
 
@@ -111,7 +185,7 @@ const CadTarefa: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const cadastrarTarefa = async (): Promise<void> => {
+  const atualizarTarefa = async (): Promise<void> => {
     if (!validarFormulario()) {
       return;
     }
@@ -127,57 +201,37 @@ const CadTarefa: React.FC = () => {
         prioridade: formData.prioridade,
         recorrente: formData.recorrente,
         recorrencia: formData.recorrente ? formData.recorrencia : null,
-        id_workspace: formData.id_workspace,
-        id_usuario: formData.id_usuario,
         responsaveis: formData.responsaveis,
       };
 
-      // Criar a tarefa primeiro
-      const tarefaCriada = await apiCall('/tarefas', 'POST', dadosEnvio);
+      // Atualizar dados básicos da tarefa
+      await apiCall(`/tarefas/${id_tarefa}`, 'PUT', dadosEnvio);
 
-      // Se há categorias selecionadas, associá-las à tarefa
-      if (formData.categorias_selecionadas.length > 0) {
-        await apiCall(
-          `/tarefas/${tarefaCriada.id_tarefa}/categorias`,
-          'POST',
-          { categorias: formData.categorias_selecionadas }
-        );
-      }
+      // Atualizar categorias associadas (sempre sobrescreve)
+      await apiCall(
+        `/tarefas/${id_tarefa}/categorias`,
+        'POST',
+        { categorias: formData.categorias_selecionadas }
+      );
 
-      Alert.alert('Sucesso', 'Tarefa cadastrada com sucesso!', [
+      Alert.alert('Sucesso', 'Tarefa atualizada com sucesso!', [
         {
           text: 'OK',
-          onPress: () => {
-            // Limpar formulário
-            setFormData({
-              titulo: '',
-              descricao: '',
-              data_fim: '',
-              status: 'a_fazer',
-              prioridade: 'media',
-              recorrente: false,
-              recorrencia: undefined,
-              id_workspace: workspaceAtual,
-              id_usuario: 1, // TODO: Obter do contexto
-              responsaveis: [],
-              categorias_selecionadas: [],
-            });
-            setErrors({});
-          },
+          onPress: () => navigation.goBack(),
         },
       ]);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Erro desconhecido';
       Alert.alert('Erro', errorMessage);
-      console.error('Erro ao cadastrar tarefa:', error);
+      console.error('Erro ao atualizar tarefa:', error);
     } finally {
       setLoading(false);
     }
   };
 
   // Função para atualizar campos do formulário
-  const updateField = (field: keyof FormData, value: any) => {
+  const updateField = (field: keyof TarefaData, value: any) => {
     setFormData(prev => ({...prev, [field]: value}));
     // Limpar erro do campo quando usuário começar a digitar
     if ((field === 'titulo' || field === 'data_fim') && errors[field]) {
@@ -185,12 +239,33 @@ const CadTarefa: React.FC = () => {
     }
   };
 
-  // Função para toggle do checkbox recorrente
+  // Função para toggle do checkbox recorrente (com validação)
   const toggleRecorrente = (value: boolean) => {
+    if (!tarefaOriginal) {
+      return;
+    }
+
+    // REGRA: Se a tarefa original não era recorrente, não pode se tornar recorrente
+    if (!tarefaOriginal.recorrente && value === true) {
+      Alert.alert(
+        'Não permitido',
+        'Uma tarefa não recorrente não pode ser convertida em recorrente.'
+      );
+      return;
+    }
+
+    // REGRA: Se a tarefa original era recorrente, ela permanece recorrente
+    if (tarefaOriginal.recorrente && value === false) {
+      Alert.alert(
+        'Não permitido',
+        'Uma tarefa recorrente não pode ser convertida em não recorrente.'
+      );
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       recorrente: value,
-      // Se não for recorrente, limpar frequência
       recorrencia: value ? prev.recorrencia : undefined,
     }));
   };
@@ -200,7 +275,7 @@ const CadTarefa: React.FC = () => {
     if (!data) {
       return '';
     }
-    return data.split('T')[0]; // Pegar apenas a parte da data (YYYY-MM-DD)
+    return data.split('T')[0];
   };
 
   // Função para formatar data do input
@@ -208,7 +283,7 @@ const CadTarefa: React.FC = () => {
     if (!data) {
       return '';
     }
-    return data + 'T00:00:00.000Z'; // Adicionar horário padrão
+    return data + 'T00:00:00.000Z';
   };
 
   // Função para obter label da prioridade
@@ -260,6 +335,14 @@ const CadTarefa: React.FC = () => {
     updateField('categorias_selecionadas', categorias);
   };
 
+  if (loadingTarefa) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Carregando dados da tarefa...</Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -268,9 +351,11 @@ const CadTarefa: React.FC = () => {
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled">
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Nova Tarefa</Text>
+          <Text style={styles.title}>Editar Tarefa</Text>
 
-          <Text style={styles.description}>Workspace: #{workspaceAtual}</Text>
+          <Text style={styles.description}>
+            Tarefa #{formData.id_tarefa} - Workspace #{formData.id_workspace}
+          </Text>
 
           {/* Campo Título */}
           <View style={styles.inputContainer}>
@@ -294,7 +379,7 @@ const CadTarefa: React.FC = () => {
             <Text style={styles.label}>Descrição</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Digite a descrição da tarefa (opcional)"
+              placeholder="Digite a descrição da tarefa"
               placeholderTextColor="#6c757d"
               value={formData.descricao}
               onChangeText={text => updateField('descricao', text)}
@@ -368,9 +453,19 @@ const CadTarefa: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Switch Recorrente */}
+          {/* Switch Recorrente (com validação) */}
           <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>Tarefa Recorrente?</Text>
+            <View style={styles.switchLabelContainer}>
+              <Text style={styles.switchLabel}>Tarefa Recorrente?</Text>
+              {tarefaOriginal && (
+                <Text style={styles.switchHint}>
+                  {tarefaOriginal.recorrente 
+                    ? '(Permanece recorrente)'
+                    : '(Não pode se tornar recorrente)'
+                  }
+                </Text>
+              )}
+            </View>
             <Switch
               value={formData.recorrente}
               onValueChange={toggleRecorrente}
@@ -380,7 +475,7 @@ const CadTarefa: React.FC = () => {
             />
           </View>
 
-          {/* Campo Frequência de Recorrência (condicional) */}
+          {/* Campo Frequência de Recorrência (condicional e editável) */}
           {formData.recorrente && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Recorrência *</Text>
@@ -396,13 +491,13 @@ const CadTarefa: React.FC = () => {
             </View>
           )}
 
-          {/* Botão Cadastrar */}
+          {/* Botão Atualizar */}
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={cadastrarTarefa}
-            disabled={loading}>
+            style={[styles.button, (loading ) && styles.buttonDisabled]}
+            onPress={atualizarTarefa}
+            disabled={loading }>
             <Text style={styles.buttonText}>
-              {loading ? 'Cadastrando...' : 'Cadastrar Tarefa'}
+              {loading ? 'Atualizando...'  : 'Atualizar Tarefa'}
             </Text>
           </TouchableOpacity>
 
@@ -410,6 +505,7 @@ const CadTarefa: React.FC = () => {
         </View>
       </ScrollView>
 
+      {/* Modals (idênticos aos do cadTarefa.tsx) */}
       {/* Modal Prioridade */}
       <Modal
         visible={modalPrioridade}
@@ -619,7 +715,17 @@ const CadTarefa: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a', // Fundo escuro padronizado
+    backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 16,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -627,7 +733,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: '#2a2a2a', // Cinza escuro para o card
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 24,
     shadowColor: '#000',
@@ -639,20 +745,20 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#404040', // Borda cinza
+    borderColor: '#404040',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 16,
-    color: '#ffffff', // Texto branco
+    color: '#ffffff',
   },
   description: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 32,
-    color: '#6c757d', // Cinza claro padronizado
+    color: '#6c757d',
     lineHeight: 22,
   },
   inputContainer: {
@@ -662,23 +768,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#ffffff', // Label branca
+    color: '#ffffff',
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#404040', // Borda cinza escuro
+    borderColor: '#404040',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    backgroundColor: '#1a1a1a', // Fundo escuro
-    color: '#ffffff', // Texto branco
+    backgroundColor: '#1a1a1a',
+    color: '#ffffff',
   },
   textArea: {
     height: 100,
     paddingTop: 14,
   },
   inputError: {
-    borderColor: '#dc3545', // Vermelho para erros
+    borderColor: '#dc3545',
   },
   errorText: {
     color: '#dc3545',
@@ -687,22 +793,22 @@ const styles = StyleSheet.create({
   },
   pickerButton: {
     borderWidth: 1.5,
-    borderColor: '#404040', // Borda cinza escuro
+    borderColor: '#404040',
     borderRadius: 10,
     padding: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a', // Fundo escuro
+    backgroundColor: '#1a1a1a',
   },
   pickerButtonText: {
     fontSize: 16,
-    color: '#ffffff', // Texto branco
+    color: '#ffffff',
     flex: 1,
   },
   pickerArrow: {
     fontSize: 16,
-    color: '#6c757d', // Cinza claro
+    color: '#6c757d',
     marginLeft: 10,
   },
   switchContainer: {
@@ -712,13 +818,21 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingVertical: 8,
   },
-  switchLabel: {
-    color: '#ffffff', // Texto branco
-    fontSize: 16,
+  switchLabelContainer: {
     flex: 1,
   },
+  switchLabel: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  switchHint: {
+    color: '#6c757d',
+    fontSize: 12,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
   button: {
-    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente padronizado
+    backgroundColor: 'rgba(108, 117, 125, 0.8)',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
@@ -733,7 +847,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: 'rgba(108, 117, 125, 0.4)', // Cinza mais claro quando desabilitado
+    backgroundColor: 'rgba(108, 117, 125, 0.4)',
   },
   buttonText: {
     color: '#ffffff',
@@ -742,30 +856,30 @@ const styles = StyleSheet.create({
   },
   requiredText: {
     fontSize: 12,
-    color: '#6c757d', // Cinza claro padronizado
+    color: '#6c757d',
     textAlign: 'center',
     marginTop: 16,
   },
-  // Estilos dos Modais
+  // Estilos dos Modals (idênticos ao cadTarefa)
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Overlay mais escuro
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#2a2a2a', // Fundo escuro do modal
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 24,
     width: '80%',
     maxHeight: '70%',
     borderWidth: 1,
-    borderColor: '#404040', // Borda cinza
+    borderColor: '#404040',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#ffffff', // Texto branco
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -775,15 +889,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#404040', // Borda cinza
+    borderColor: '#404040',
   },
   modalItemSelected: {
-    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente padronizado
+    backgroundColor: 'rgba(108, 117, 125, 0.8)',
     borderColor: 'rgba(108, 117, 125, 0.8)',
   },
   modalItemText: {
     fontSize: 16,
-    color: '#ffffff', // Texto branco
+    color: '#ffffff',
     textAlign: 'center',
   },
   modalItemTextSelected: {
@@ -791,7 +905,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalCloseButton: {
-    backgroundColor: '#dc3545', // Vermelho para cancelar
+    backgroundColor: '#dc3545',
     borderRadius: 8,
     padding: 12,
     marginTop: 16,
@@ -838,4 +952,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CadTarefa;
+export default EditTarefa;

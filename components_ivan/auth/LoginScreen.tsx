@@ -10,15 +10,28 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {login} from '../../services/authService';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {RootStackParamList} from '../router';
+import {login, setupActiveWorkspace} from '../../services/authService';
+import FirstTimePopup from '../popup/FirstTimePopup';
 
-const LoginScreen: React.FC = () => {
+type LoginScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'Login'
+>;
+
+type Props = {
+  navigation: LoginScreenNavigationProp;
+};
+
+const LoginScreen: React.FC<Props> = ({navigation}) => {
   const [formData, setFormData] = useState({
     email: '',
     senha: '',
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<{email?: string; senha?: string}>({});
+  const [showFirstTimePopup, setShowFirstTimePopup] = useState<boolean>(false);
 
   // Função para validar formulário
   const validarFormulario = (): boolean => {
@@ -48,16 +61,30 @@ const LoginScreen: React.FC = () => {
       const resultado = await login(formData.email, formData.senha);
 
       if (resultado.sucesso) {
-        Alert.alert('Sucesso', 'Login realizado com sucesso!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Aqui você navegaria para a tela principal
-              console.log('Navegando para tela principal...');
-              // navigation.navigate('Home');
+        // Verificar se o usuário já possui workspaces e configurar workspace ativo
+        const workspaceSetup = await setupActiveWorkspace();
+        
+        if (workspaceSetup.hasWorkspace) {
+          // Se já tem workspaces, vai direto para a Home
+          Alert.alert('Sucesso', 'Login realizado com sucesso!', [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Home');
+              },
             },
-          },
-        ]);
+          ]);
+        } else {
+          // Se não tem workspaces, mostra o popup
+          Alert.alert('Sucesso', 'Login realizado com sucesso!', [
+            {
+              text: 'OK',
+              onPress: () => {
+                setShowFirstTimePopup(true);
+              },
+            },
+          ]);
+        }
       } else {
         Alert.alert('Erro', resultado.erro || 'Erro ao fazer login');
       }
@@ -69,6 +96,23 @@ const LoginScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Função para lidar com a criação de workspace
+  const handleCreateWorkspace = () => {
+    setShowFirstTimePopup(false);
+    navigation.navigate('CadastroWorkspace');
+  };
+
+  // Função para pular e ir direto para home
+  const handleSkipWorkspaceCreation = () => {
+    setShowFirstTimePopup(false);
+    navigation.navigate('Home');
+  };
+
+  // Função para ir para cadastro
+  const handleGoToSignup = () => {
+    navigation.navigate('CadastroUsuario');
   };
 
   // Função para atualizar campos do formulário
@@ -142,13 +186,22 @@ const LoginScreen: React.FC = () => {
           <Text style={styles.requiredText}>* Campos obrigatórios</Text>
 
           {/* Link para cadastro */}
-          <TouchableOpacity style={styles.linkContainer}>
+          <TouchableOpacity
+            style={styles.linkContainer}
+            onPress={handleGoToSignup}>
             <Text style={styles.linkText}>
               Não tem uma conta? Cadastre-se aqui
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Popup de primeira vez */}
+      <FirstTimePopup
+        visible={showFirstTimePopup}
+        onCreateWorkspace={handleCreateWorkspace}
+        onClose={handleSkipWorkspaceCreation}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -156,7 +209,7 @@ const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2f3437', // Cinza escuro do Notion
+    backgroundColor: '#ffffff',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -164,7 +217,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: '#373b3f', // Cinza um pouco mais claro para o card
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 24,
     shadowColor: '#000',
@@ -172,22 +225,24 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#ffffff', // Texto branco
+    color: '#1a1a1a',
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 32,
-    color: '#a0a0a0', // Cinza claro para texto secundário
+    color: '#6c757d',
   },
   inputContainer: {
     marginBottom: 20,
@@ -196,42 +251,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#ffffff', // Label branca
+    color: '#495057',
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#ffffff', // Borda branca
+    borderColor: '#dee2e6',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    backgroundColor: 'transparent', // Fundo transparente
-    color: '#ffffff', // Texto branco
+    backgroundColor: '#ffffff',
+    color: '#495057',
   },
   inputError: {
-    borderColor: '#ff6b6b', // Vermelho mais suave para erros
+    borderColor: '#dc3545',
   },
   errorText: {
-    color: '#ff6b6b',
+    color: '#dc3545',
     fontSize: 14,
     marginTop: 6,
   },
   button: {
-    backgroundColor: '#007acc', // Azul do Notion
+    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#007acc',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#5a5d61', // Cinza para desabilitado
+    backgroundColor: 'rgba(108, 117, 125, 0.4)',
   },
   buttonText: {
     color: '#ffffff',
@@ -240,7 +295,7 @@ const styles = StyleSheet.create({
   },
   requiredText: {
     fontSize: 12,
-    color: '#a0a0a0', // Cinza claro para texto secundário
+    color: '#6c757d',
     textAlign: 'center',
     marginTop: 16,
   },
@@ -249,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkText: {
-    color: '#007acc',
+    color: 'rgba(108, 117, 125, 0.9)',
     fontSize: 16,
     textDecorationLine: 'underline',
   },

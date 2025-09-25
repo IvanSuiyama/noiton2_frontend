@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import CategoriaInterface from './categoriaInterface';
-import {getUserId, apiCall} from '../../services/authService';
+import {getUserEmail, apiCall} from '../../services/authService';
 
 // Tipo baseado na CategoriaInterface, omitindo id_categoria que é gerado no backend
 type FormData = Omit<CategoriaInterface, 'id_categoria'>;
@@ -19,44 +19,48 @@ type FormData = Omit<CategoriaInterface, 'id_categoria'>;
 const CadCategoria: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     nome: '',
-    cor: '',
-    id_usuario: 0, // Será obtido do contexto de autenticação
+    cor: 'rgba(108, 117, 125, 0.8)', // Cor padrão - cinza transparente padronizado
+    id_workspace: 1, // TODO: Obter do contexto/parâmetro de navegação
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<Partial<Pick<FormData, 'nome'>>>({});
+  const [workspaceAtual, setWorkspaceAtual] = useState<number>(1); // TODO: Implementar seleção de workspace
 
-  // Obter ID do usuário logado ao inicializar o componente
+  // Obter workspace atual ao inicializar o componente
   useEffect(() => {
-    const obterUsuarioLogado = async () => {
+    const inicializarWorkspace = async () => {
       try {
-        const userId = await getUserId();
-        if (userId) {
-          setFormData(prev => ({...prev, id_usuario: userId}));
-        }
+        // TODO: Implementar obtenção do workspace atual
+        // Por enquanto, usar workspace padrão (ID = 1)
+        const workspaceId = 1; // Será obtido do contexto de navegação/parâmetro
+        setWorkspaceAtual(workspaceId);
+        setFormData(prev => ({...prev, id_workspace: workspaceId}));
       } catch (error) {
-        console.error('Erro ao obter ID do usuário:', error);
+        console.error('Erro ao inicializar workspace:', error);
         Alert.alert(
           'Erro',
-          'Erro ao obter dados do usuário. Faça login novamente.',
+          'Erro ao obter dados do workspace.',
         );
       }
     };
 
-    obterUsuarioLogado();
+    inicializarWorkspace();
   }, []);
 
   // Cores predefinidas para categoria
   const coresPredefinidas = [
-    '#ff6b6b',
-    '#4ecdc4',
-    '#45b7d1',
-    '#96ceb4',
-    '#ffeaa7',
-    '#dda0dd',
-    '#98d8c8',
-    '#f7dc6f',
-    '#bb8fce',
-    '#85c1e9',
+    '#ff6b6b', // Vermelho
+    '#4ecdc4', // Turquesa
+    '#45b7d1', // Azul claro
+    '#96ceb4', // Verde claro
+    '#feca57', // Amarelo
+    '#ff9ff3', // Rosa
+    '#54a0ff', // Azul
+    '#5f27cd', // Roxo
+    '#00d2d3', // Ciano
+    '#ff9f43', // Laranja
+    '#10ac84', // Verde escuro
+    '#ee5a24', // Laranja escuro
   ];
 
   // Função para validar formulário
@@ -80,8 +84,8 @@ const CadCategoria: React.FC = () => {
     try {
       await apiCall('/categorias', 'POST', {
         nome: formData.nome,
-        cor: formData.cor || null,
-        id_usuario: formData.id_usuario,
+        cor: formData.cor,
+        id_workspace: formData.id_workspace,
       });
 
       Alert.alert('Sucesso', 'Categoria cadastrada com sucesso!', [
@@ -91,8 +95,8 @@ const CadCategoria: React.FC = () => {
             // Limpar formulário
             setFormData(prev => ({
               nome: '',
-              cor: '',
-              id_usuario: prev.id_usuario, // Manter ID do usuário
+              cor: 'rgba(108, 117, 125, 0.8)', // Manter cor padronizada
+              id_workspace: prev.id_workspace, // Manter workspace atual
             }));
             setErrors({});
           },
@@ -109,11 +113,11 @@ const CadCategoria: React.FC = () => {
   };
 
   // Função para atualizar campos do formulário
-  const updateField = (field: keyof FormData, value: string | number) => {
+  const updateField = (field: keyof FormData, value: any) => {
     setFormData(prev => ({...prev, [field]: value}));
     // Limpar erro do campo quando usuário começar a digitar
-    if (field === 'nome' && errors.nome) {
-      setErrors(prev => ({...prev, nome: undefined}));
+    if (field === 'nome' && errors[field]) {
+      setErrors(prev => ({...prev, [field]: undefined}));
     }
   };
 
@@ -127,13 +131,17 @@ const CadCategoria: React.FC = () => {
         <View style={styles.formContainer}>
           <Text style={styles.title}>Cadastro de Categoria</Text>
 
+          <Text style={styles.description}>
+            Workspace: #{workspaceAtual}
+          </Text>
+
           {/* Campo Nome */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nome *</Text>
+            <Text style={styles.label}>Nome da Categoria *</Text>
             <TextInput
               style={[styles.input, errors.nome ? styles.inputError : null]}
               placeholder="Digite o nome da categoria"
-              placeholderTextColor="#a0a0a0"
+              placeholderTextColor="#6c757d"
               value={formData.nome}
               onChangeText={text => updateField('nome', text)}
               autoCapitalize="words"
@@ -142,49 +150,36 @@ const CadCategoria: React.FC = () => {
             {errors.nome && <Text style={styles.errorText}>{errors.nome}</Text>}
           </View>
 
-          {/* Campo Cor */}
+          {/* Seleção de Cor */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Cor da Categoria</Text>
-            <Text style={styles.subLabel}>
-              Selecione uma cor ou digite o código hexadecimal
-            </Text>
+            <Text style={styles.label}>Cor da Categoria *</Text>
+            <View style={styles.previewContainer}>
+              <View
+                style={[
+                  styles.colorPreview,
+                  {backgroundColor: formData.cor},
+                ]}
+              />
+              <Text style={styles.colorPreviewText}>{formData.cor}</Text>
+            </View>
 
-            {/* Cores predefinidas */}
-            <View style={styles.colorsContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.colorScrollContainer}>
               {coresPredefinidas.map(cor => (
                 <TouchableOpacity
                   key={cor}
                   style={[
-                    styles.colorButton,
+                    styles.colorOption,
                     {backgroundColor: cor},
-                    formData.cor === cor && styles.colorButtonSelected,
+                    formData.cor === cor && styles.colorOptionSelected,
                   ]}
                   onPress={() => updateField('cor', cor)}
                   disabled={loading}
                 />
               ))}
-            </View>
-
-            {/* Input para cor personalizada */}
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: #ff6b6b (opcional)"
-              placeholderTextColor="#a0a0a0"
-              value={formData.cor}
-              onChangeText={text => updateField('cor', text)}
-              autoCapitalize="none"
-              editable={!loading}
-            />
-
-            {/* Preview da cor selecionada */}
-            {formData.cor && (
-              <View style={styles.previewContainer}>
-                <Text style={styles.previewLabel}>Preview:</Text>
-                <View
-                  style={[styles.previewColor, {backgroundColor: formData.cor}]}
-                />
-              </View>
-            )}
+            </ScrollView>
           </View>
 
           {/* Botão Cadastrar */}
@@ -207,7 +202,7 @@ const CadCategoria: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2f3437', // Cinza escuro do Notion
+    backgroundColor: '#1a1a1a', // Fundo escuro padronizado
   },
   scrollContainer: {
     flexGrow: 1,
@@ -215,7 +210,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: '#373b3f', // Cinza um pouco mais claro para o card
+    backgroundColor: '#2a2a2a', // Cinza escuro para o card
     borderRadius: 12,
     padding: 24,
     shadowColor: '#000',
@@ -226,13 +221,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: '#404040', // Borda cinza
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
     color: '#ffffff', // Texto branco
+  },
+  description: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 32,
+    color: '#6c757d', // Cinza claro padronizado
+    lineHeight: 22,
   },
   inputContainer: {
     marginBottom: 20,
@@ -243,76 +247,69 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#ffffff', // Label branca
   },
-  subLabel: {
-    fontSize: 14,
-    marginBottom: 12,
-    color: '#a0a0a0', // Cinza claro para texto secundário
-  },
   input: {
     borderWidth: 1.5,
-    borderColor: '#ffffff', // Borda branca
+    borderColor: '#404040', // Borda cinza escuro
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    backgroundColor: 'transparent', // Fundo transparente
+    backgroundColor: '#1a1a1a', // Fundo escuro
     color: '#ffffff', // Texto branco
   },
   inputError: {
-    borderColor: '#ff6b6b', // Vermelho mais suave para erros
+    borderColor: '#dc3545', // Vermelho para erros
   },
   errorText: {
-    color: '#ff6b6b',
+    color: '#dc3545',
     fontSize: 14,
     marginTop: 6,
-  },
-  colorsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
-  },
-  colorButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-  colorButtonSelected: {
-    borderColor: '#ffffff',
-    shadowColor: '#ffffff',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 8,
   },
   previewContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#404040', // Fundo cinza escuro
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#555555', // Borda mais clara
   },
-  previewLabel: {
-    color: '#ffffff',
-    fontSize: 14,
-    marginRight: 12,
-  },
-  previewColor: {
+  colorPreview: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    borderWidth: 1,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#ffffff', // Borda branca
+  },
+  colorPreviewText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  colorScrollContainer: {
+    paddingVertical: 8,
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorOptionSelected: {
     borderColor: '#ffffff',
+    borderWidth: 3,
+    transform: [{scale: 1.1}],
   },
   button: {
-    backgroundColor: '#007acc', // Azul do Notion
+    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente padronizado
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#007acc',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -322,7 +319,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#5a5d61', // Cinza para desabilitado
+    backgroundColor: 'rgba(108, 117, 125, 0.4)', // Cinza mais claro quando desabilitado
   },
   buttonText: {
     color: '#ffffff',
@@ -331,7 +328,7 @@ const styles = StyleSheet.create({
   },
   requiredText: {
     fontSize: 12,
-    color: '#a0a0a0', // Cinza claro para texto secundário
+    color: '#6c757d', // Cinza claro padronizado
     textAlign: 'center',
     marginTop: 16,
   },

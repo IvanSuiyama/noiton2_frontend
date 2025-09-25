@@ -1,8 +1,9 @@
 interface WorkspaceInterface {
-  id_workspace: number;
-  nome?: string;
-  equipe?: boolean;
+  id_workspace?: number;
+  nome: string;
+  equipe: boolean;
   criador: string;
+  emails: string[]; // lista de emails dos usuários
 }
 
 interface UsuarioWorkspaceInterface {

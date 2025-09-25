@@ -10,12 +10,23 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {RootStackParamList} from '../router';
 import UserInterface from './userInterface';
+
+type CadUsuarioNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'CadastroUsuario'
+>;
+
+type Props = {
+  navigation: CadUsuarioNavigationProp;
+};
 
 // Tipo baseado na UserInterface, omitindo id_usuario que é gerado no backend
 type FormData = Omit<UserInterface, 'id_usuario'>;
 
-const CadUsuario: React.FC = () => {
+const CadUsuario: React.FC<Props> = ({navigation}) => {
   const [formData, setFormData] = useState<FormData>({
     nome: '',
     email: '',
@@ -56,7 +67,7 @@ const CadUsuario: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://192.168.15.15:3000/usuarios', {
+      const response = await fetch('http://10.241.191.119:3000/usuarios', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,14 +85,8 @@ const CadUsuario: React.FC = () => {
           {
             text: 'OK',
             onPress: () => {
-              // Limpar formulário
-              setFormData({
-                nome: '',
-                email: '',
-                senha: '',
-                telefone: '',
-              });
-              setErrors({});
+              // Redirecionar para a tela de login
+              navigation.navigate('Login');
             },
           },
         ]);
@@ -203,7 +208,7 @@ const CadUsuario: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2f3437', // Cinza escuro do Notion
+    backgroundColor: '#ffffff',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -211,7 +216,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: '#373b3f', // Cinza um pouco mais claro para o card
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 24,
     shadowColor: '#000',
@@ -219,16 +224,18 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 32,
-    color: '#ffffff', // Texto branco
+    color: '#1a1a1a',
   },
   inputContainer: {
     marginBottom: 20,
@@ -237,42 +244,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#ffffff', // Label branca
+    color: '#495057',
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#ffffff', // Borda branca
+    borderColor: '#dee2e6',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    backgroundColor: 'transparent', // Fundo transparente
-    color: '#ffffff', // Texto branco
+    backgroundColor: '#ffffff',
+    color: '#495057',
   },
   inputError: {
-    borderColor: '#ff6b6b', // Vermelho mais suave para erros
+    borderColor: '#dc3545',
   },
   errorText: {
-    color: '#ff6b6b',
+    color: '#dc3545',
     fontSize: 14,
     marginTop: 6,
   },
   button: {
-    backgroundColor: '#007acc', // Azul do Notion
+    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#007acc',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#5a5d61', // Cinza para desabilitado
+    backgroundColor: 'rgba(108, 117, 125, 0.4)',
   },
   buttonText: {
     color: '#ffffff',
@@ -281,7 +288,7 @@ const styles = StyleSheet.create({
   },
   requiredText: {
     fontSize: 12,
-    color: '#a0a0a0', // Cinza claro para texto secundário
+    color: '#6c757d',
     textAlign: 'center',
     marginTop: 16,
   },

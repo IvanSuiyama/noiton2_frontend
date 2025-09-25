@@ -11,17 +11,29 @@ import {
   Platform,
   Switch,
 } from 'react-native';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {RootStackParamList} from '../router';
 import WorkspaceInterface from './workspaceInterface';
-import {getUserEmail, apiCall} from '../../services/authService';
+import {getUserEmail, apiCall, setActiveWorkspace} from '../../services/authService';
+
+type CadWorkspaceNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'CadastroWorkspace'
+>;
+
+type Props = {
+  navigation: CadWorkspaceNavigationProp;
+};
 
 // Tipo baseado na WorkspaceInterface, omitindo id_workspace que é gerado no backend
 type FormData = Omit<WorkspaceInterface, 'id_workspace'>;
 
-const CadWorkspace: React.FC = () => {
+const CadWorkspace: React.FC<Props> = ({navigation}) => {
   const [formData, setFormData] = useState<FormData>({
     nome: '',
     equipe: false,
     criador: '', // Será obtido do contexto de autenticação
+    emails: [], // Lista de emails dos membros
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<
@@ -34,7 +46,11 @@ const CadWorkspace: React.FC = () => {
       try {
         const userEmail = await getUserEmail();
         if (userEmail) {
-          setFormData(prev => ({...prev, criador: userEmail}));
+          setFormData(prev => ({
+            ...prev, 
+            criador: userEmail,
+            emails: [userEmail] // Incluir o criador na lista de emails automaticamente
+          }));
         }
       } catch (error) {
         console.error('Erro ao obter email do usuário:', error);
@@ -71,23 +87,29 @@ const CadWorkspace: React.FC = () => {
 
     setLoading(true);
     try {
-      await apiCall('/workspaces', 'POST', {
+      // Garantir que o criador sempre esteja na lista de emails
+      const emailsComCriador = formData.emails.includes(formData.criador) 
+        ? formData.emails 
+        : [formData.criador, ...formData.emails];
+
+      const response = await apiCall('/workspaces', 'POST', {
         nome: formData.nome,
         equipe: formData.equipe,
         criador: formData.criador,
+        emails: emailsComCriador, // Enviar a lista de emails incluindo o criador
       });
+
+      // Definir o workspace recém-criado como ativo
+      if (response && response.id_workspace) {
+        await setActiveWorkspace(response.id_workspace, formData.nome || 'Workspace');
+      }
 
       Alert.alert('Sucesso', 'Workspace cadastrado com sucesso!', [
         {
           text: 'OK',
           onPress: () => {
-            // Limpar formulário
-            setFormData(prev => ({
-              nome: '',
-              equipe: false,
-              criador: prev.criador, // Manter email do usuário
-            }));
-            setErrors({});
+            // Redirecionar para a tela principal
+            navigation.navigate('Home');
           },
         },
       ]);
@@ -102,7 +124,7 @@ const CadWorkspace: React.FC = () => {
   };
 
   // Função para atualizar campos do formulário
-  const updateField = (field: keyof FormData, value: string | boolean) => {
+  const updateField = (field: keyof FormData, value: string | boolean | string[]) => {
     setFormData(prev => ({...prev, [field]: value}));
     // Limpar erro do campo quando usuário começar a digitar
     if ((field === 'nome' || field === 'criador') && errors[field]) {
@@ -131,32 +153,13 @@ const CadWorkspace: React.FC = () => {
             <TextInput
               style={[styles.input, errors.nome ? styles.inputError : null]}
               placeholder="Digite o nome do workspace"
-              placeholderTextColor="#a0a0a0"
+              placeholderTextColor="#6c757d"
               value={formData.nome}
               onChangeText={text => updateField('nome', text)}
               autoCapitalize="words"
               editable={!loading}
             />
             {errors.nome && <Text style={styles.errorText}>{errors.nome}</Text>}
-          </View>
-
-          {/* Campo Criador */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Criador *</Text>
-            <TextInput
-              style={[styles.input, errors.criador ? styles.inputError : null]}
-              placeholder="Digite o email do criador"
-              placeholderTextColor="#a0a0a0"
-              value={formData.criador}
-              onChangeText={text => updateField('criador', text)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
-            {errors.criador && (
-              <Text style={styles.errorText}>{errors.criador}</Text>
-            )}
           </View>
 
           {/* Switch Equipe */}
@@ -171,9 +174,9 @@ const CadWorkspace: React.FC = () => {
               <Switch
                 value={formData.equipe}
                 onValueChange={value => updateField('equipe', value)}
-                trackColor={{false: '#5a5d61', true: '#007acc'}}
-                thumbColor={formData.equipe ? '#ffffff' : '#a0a0a0'}
-                ios_backgroundColor="#5a5d61"
+                trackColor={{false: '#dee2e6', true: 'rgba(108, 117, 125, 0.6)'}}
+                thumbColor={formData.equipe ? '#ffffff' : '#6c757d'}
+                ios_backgroundColor="#dee2e6"
                 disabled={loading}
               />
             </View>
@@ -189,6 +192,17 @@ const CadWorkspace: React.FC = () => {
               </Text>
             </View>
           )}
+
+          {/* Informações sobre membros */}
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoIcon}>👑</Text>
+            <View style={styles.infoTextContainer}>
+              <Text style={styles.infoTitle}>Membro Automático</Text>
+              <Text style={styles.infoText}>
+                Como criador, você será automaticamente adicionado como membro do workspace: {formData.criador}
+              </Text>
+            </View>
+          </View>
 
           {/* Botão Cadastrar */}
           <TouchableOpacity
@@ -210,7 +224,7 @@ const CadWorkspace: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2f3437', // Cinza escuro do Notion
+    backgroundColor: '#1a1a1a', // Fundo escuro padronizado
   },
   scrollContainer: {
     flexGrow: 1,
@@ -218,7 +232,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: '#373b3f', // Cinza um pouco mais claro para o card
+    backgroundColor: '#2a2a2a', // Cinza escuro para o card
     borderRadius: 12,
     padding: 24,
     shadowColor: '#000',
@@ -229,6 +243,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: '#404040', // Borda cinza
   },
   title: {
     fontSize: 28,
@@ -241,7 +257,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 32,
-    color: '#a0a0a0', // Cinza claro para texto secundário
+    color: '#6c757d', // Cinza claro padronizado
     lineHeight: 22,
   },
   inputContainer: {
@@ -255,18 +271,18 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#ffffff', // Borda branca
+    borderColor: '#404040', // Borda cinza escuro
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    backgroundColor: 'transparent', // Fundo transparente
+    backgroundColor: '#1a1a1a', // Fundo escuro
     color: '#ffffff', // Texto branco
   },
   inputError: {
-    borderColor: '#ff6b6b', // Vermelho mais suave para erros
+    borderColor: '#dc3545', // Vermelho para erros
   },
   errorText: {
-    color: '#ff6b6b',
+    color: '#dc3545',
     fontSize: 14,
     marginTop: 6,
   },
@@ -286,40 +302,49 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#ffffff', // Texto branco
     marginBottom: 4,
   },
   switchDescription: {
     fontSize: 14,
-    color: '#a0a0a0',
+    color: '#6c757d', // Cinza claro padronizado
     lineHeight: 18,
   },
   infoContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0, 122, 204, 0.1)',
+    backgroundColor: 'rgba(108, 117, 125, 0.2)', // Fundo cinza transparente mais escuro
     borderRadius: 10,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(0, 122, 204, 0.3)',
+    borderColor: 'rgba(108, 117, 125, 0.5)', // Borda mais visível no tema escuro
   },
   infoIcon: {
     fontSize: 20,
     marginRight: 12,
   },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: '#ffffff',
+    color: '#ffffff', // Texto branco
     lineHeight: 20,
   },
   button: {
-    backgroundColor: '#007acc', // Azul do Notion
+    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente padronizado
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#007acc',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -329,7 +354,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#5a5d61', // Cinza para desabilitado
+    backgroundColor: 'rgba(108, 117, 125, 0.4)', // Cinza mais claro quando desabilitado
   },
   buttonText: {
     color: '#ffffff',
@@ -338,7 +363,7 @@ const styles = StyleSheet.create({
   },
   requiredText: {
     fontSize: 12,
-    color: '#a0a0a0', // Cinza claro para texto secundário
+    color: '#6c757d', // Cinza claro padronizado
     textAlign: 'center',
     marginTop: 16,
   },
