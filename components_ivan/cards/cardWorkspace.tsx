@@ -72,6 +72,10 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
     navigation.navigate('CadastroWorkspace');
   };
 
+  const handleEditWorkspace = () => {
+    (navigation as any).navigate('EditWorkspace');
+  };
+
   return (
     <View>
       <TouchableOpacity
@@ -83,7 +87,15 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
           </Text>
         </View>
         <View style={styles.workspaceInfo}>
-          <Text style={styles.workspaceName}>{workspaceName}</Text>
+          <View style={styles.workspaceNameContainer}>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={handleEditWorkspace}
+            >
+              <Text style={styles.editIcon}>✏️</Text>
+            </TouchableOpacity>
+            <Text style={styles.workspaceName}>{workspaceName}</Text>
+          </View>
           <Text style={styles.workspaceLabel}>Workspace</Text>
         </View>
         <Text style={styles.chevronDown}>▼</Text>
@@ -172,11 +184,27 @@ const styles = StyleSheet.create({
   workspaceInfo: {
     flex: 1,
   },
+
+  workspaceNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  editButton: {
+    marginRight: 8,
+    padding: 2,
+  },
+
+  editIcon: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
   
   workspaceName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
+    flex: 1,
   },
   
   workspaceLabel: {
