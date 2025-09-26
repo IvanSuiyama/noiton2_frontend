@@ -44,11 +44,11 @@ const EditWorkspace: React.FC = () => {
     buscarDadosWorkspace();
   }, []);
 
+  // Busca workspace por nome (apenas para edição)
   const buscarDadosWorkspace = async () => {
     try {
       setLoadingInitial(true);
-      const response = await apiCall(`/workspace/nome/${workspaceName}`, 'GET');
-
+      const response = await apiCall(`/workspaces/nome/${workspaceName}`, 'GET');
       if (response) {
         setWorkspace(response);
         setOriginalName(response.nome);
@@ -106,8 +106,9 @@ const EditWorkspace: React.FC = () => {
         equipe: workspace.equipe,
       };
 
+      // Atualiza workspace por nome (rota backend)
       const response = await apiCall(
-        `/workspace/${originalName}`,
+        `/workspaces/nome/${originalName}`,
         'PUT',
         dadosParaEnvio
       );

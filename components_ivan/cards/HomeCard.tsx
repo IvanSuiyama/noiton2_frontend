@@ -13,8 +13,10 @@ import { RootStackParamList } from '../router';
 import {
   apiCall,
   getActiveWorkspaceId,
+  getActiveWorkspaceName,
   getUserEmail,
   getUserId,
+  getWorkspaceByEmail,
 } from '../../services/authService';
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
 
@@ -52,8 +54,8 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
   const [atividades, setAtividades] = useState<AtividadeRecente[]>([]);
   const [loading, setLoading] = useState(true);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string>('');
   const [workspaceInfo, setWorkspaceInfo] = useState<any>(null);
-  const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
     initializeData();
@@ -62,16 +64,15 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
   const initializeData = async () => {
     try {
       const id = await getActiveWorkspaceId();
-      const email = await getUserEmail();
-      
+      const name = await getActiveWorkspaceName();
       setWorkspaceId(id);
-      setUserEmail(email || '');
+      setWorkspaceName(name || '');
 
-      if (id) {
+      if (id && name) {
         await Promise.all([
           carregarEstatisticas(id),
           carregarTarefasHoje(id),
-          carregarWorkspaceInfo(id),
+          carregarWorkspaceInfo(name),
         ]);
       }
     } catch (error) {
@@ -81,19 +82,20 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
     }
   };
 
-  const carregarWorkspaceInfo = async (id: number) => {
+  // Busca workspace por nome (rota correta do backend)
+  const carregarWorkspaceInfo = async (nome: string) => {
     try {
-      const workspaceData = await apiCall(`/workspaces/${id}`, 'GET');
+      const workspaceData = await apiCall(`/workspaces/nome/${encodeURIComponent(nome)}`, 'GET');
       setWorkspaceInfo(workspaceData);
     } catch (error) {
       console.error('Erro ao obter informações do workspace:', error);
     }
   };
 
+  // Sempre buscar tarefas pelo id do workspace
   const carregarEstatisticas = async (wsId: number) => {
     try {
       const todasTarefas = await apiCall(`/tarefas/workspace/${wsId}`, 'GET');
-      
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
       const amanha = new Date(hoje);
@@ -101,8 +103,6 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
 
       const estatisticas = todasTarefas.reduce((acc: DashboardStats, tarefa: TarefaMultiplaInterface) => {
         acc.totalTarefas++;
-
-        // Contar por status
         switch (tarefa.status) {
           case 'a_fazer':
             acc.tarefasPendentes++;
@@ -111,8 +111,7 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
             acc.tarefasEmProgresso++;
             break;
           case 'concluido':
-            // Verificar se foi concluída hoje
-            const dataConclusao = new Date(tarefa.data_criacao); // Usando data_criacao como proxy
+            const dataConclusao = new Date(tarefa.data_criacao);
             if (dataConclusao >= hoje && dataConclusao < amanha) {
               acc.tarefasConcluidasHoje++;
             }
@@ -121,12 +120,9 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
             acc.tarefasAtrasadas++;
             break;
         }
-
-        // Contar recorrentes
         if (tarefa.recorrente) {
           acc.tarefasRecorrentes++;
         }
-
         return acc;
       }, {
         tarefasPendentes: 0,
@@ -136,37 +132,30 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
         tarefasRecorrentes: 0,
         totalTarefas: 0,
       });
-
       setStats(estatisticas);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
     }
   };
 
+  // Sempre buscar tarefas pelo id do workspace
   const carregarTarefasHoje = async (wsId: number) => {
     try {
       const todasTarefas = await apiCall(`/tarefas/workspace/${wsId}`, 'GET');
-      
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
       const amanha = new Date(hoje);
       amanha.setDate(amanha.getDate() + 1);
-
-      // Filtrar tarefas para hoje (com data_fim de hoje ou tarefas pendentes sem data_fim)
       const tarefasParaHoje = todasTarefas.filter((tarefa: TarefaMultiplaInterface) => {
         if (tarefa.status === 'concluido') {
           return false;
         }
-        
         if (tarefa.data_fim) {
           const dataFim = new Date(tarefa.data_fim);
           return dataFim >= hoje && dataFim < amanha;
         }
-        
-        // Se não tem data_fim, considerar tarefas urgentes ou de alta prioridade
         return tarefa.prioridade === 'urgente' || tarefa.prioridade === 'alta';
-      }).slice(0, 3); // Limitar a 3 tarefas
-
+      }).slice(0, 3);
       setTarefasHoje(tarefasParaHoje);
     } catch (error) {
       console.error('Erro ao carregar tarefas de hoje:', error);

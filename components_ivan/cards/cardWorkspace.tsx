@@ -14,6 +14,7 @@ import {
   getActiveWorkspaceName,
   getUserWorkspaces,
   setActiveWorkspace,
+  getUserEmail,
 } from '../../services/authService';
 
 type CardWorkspaceNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -23,14 +24,27 @@ interface CardWorkspaceProps {
 }
 
 const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
+  // Estilo do lápis igual ao do card de usuário
+  const pencilIconStyle = {
+    fontSize: 20,
+    color: '#fff700',
+    textShadowColor: '#fff700',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+    fontWeight: 'bold' as 'bold',
+    opacity: 1,
+  };
   const [workspaceName, setWorkspaceName] = useState('');
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
   const [userWorkspaces, setUserWorkspaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     loadWorkspaceData();
     loadWorkspaces();
+    // Carregar email do usuário logado
+    getUserEmail().then(email => setUserEmail(email || ''));
   }, []);
 
   const loadWorkspaceData = async () => {
@@ -42,6 +56,7 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
     }
   };
 
+  // Busca workspaces do usuário logado (por email)
   const loadWorkspaces = async () => {
     try {
       setLoading(true);
@@ -55,6 +70,7 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
     }
   };
 
+  // Troca o workspace ativo (id e nome)
   const handleWorkspaceChange = async (workspace: any) => {
     try {
       await setActiveWorkspace(workspace.id_workspace, workspace.nome);
@@ -72,8 +88,12 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
     navigation.navigate('CadastroWorkspace');
   };
 
-  const handleEditWorkspace = () => {
-    (navigation as any).navigate('EditWorkspace');
+  // Navega para edição do workspace, passando nome e email
+  const handleEditWorkspace = (wsName: string) => {
+    navigation.navigate('EditWorkspace', {
+      workspaceName: wsName,
+      userEmail,
+    });
   };
 
   return (
@@ -88,13 +108,14 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
         </View>
         <View style={styles.workspaceInfo}>
           <View style={styles.workspaceNameContainer}>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={handleEditWorkspace}
-            >
-              <Text style={styles.editIcon}>✏️</Text>
-            </TouchableOpacity>
             <Text style={styles.workspaceName}>{workspaceName}</Text>
+            <TouchableOpacity
+              style={styles.editButtonCard}
+              onPress={() => handleEditWorkspace(workspaceName)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={pencilIconStyle}>✏️</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.workspaceLabel}>Workspace</Text>
         </View>
@@ -120,24 +141,33 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
               data={userWorkspaces}
               keyExtractor={(item) => item.id_workspace.toString()}
               renderItem={({item}) => (
-                <TouchableOpacity
-                  style={styles.workspaceItem}
-                  onPress={() => handleWorkspaceChange(item)}>
-                  <View style={styles.workspaceItemIcon}>
-                    <Text style={styles.workspaceItemIconText}>
-                      {item.nome.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.workspaceItemInfo}>
-                    <Text style={styles.workspaceItemName}>{item.nome}</Text>
-                    <Text style={styles.workspaceItemType}>
-                      {item.equipe ? 'Equipe' : 'Pessoal'}
-                    </Text>
-                  </View>
-                  {workspaceName === item.nome && (
-                    <Text style={styles.workspaceSelected}>✓</Text>
-                  )}
-                </TouchableOpacity>
+                <View style={styles.workspaceItemRow}>
+                  <TouchableOpacity
+                    style={styles.workspaceItem}
+                    onPress={() => handleWorkspaceChange(item)}>
+                    <View style={styles.workspaceItemIcon}>
+                      <Text style={styles.workspaceItemIconText}>
+                        {item.nome.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.workspaceItemInfo}>
+                      <Text style={styles.workspaceItemName}>{item.nome}</Text>
+                      <Text style={styles.workspaceItemType}>
+                        {item.equipe ? 'Equipe' : 'Pessoal'}
+                      </Text>
+                    </View>
+                    {workspaceName === item.nome && (
+                      <Text style={styles.workspaceSelected}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.editButtonModal}
+                    onPress={() => handleEditWorkspace(item.nome)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={pencilIconStyle}>✏️</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             />
             
@@ -156,6 +186,14 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  editButtonCard: {
+    marginLeft: 8,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // editIconNeon removido, agora é inline
   workspaceCard: {
     flex: 1,
     flexDirection: 'row',
@@ -188,17 +226,22 @@ const styles = StyleSheet.create({
   workspaceNameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
 
-  editButton: {
-    marginRight: 8,
-    padding: 2,
+  workspaceItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
-  editIcon: {
-    fontSize: 14,
-    opacity: 0.7,
+  editButtonModal: {
+    marginLeft: 4,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  // editIcon removido, agora é inline
   
   workspaceName: {
     fontSize: 14,

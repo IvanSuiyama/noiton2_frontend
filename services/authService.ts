@@ -151,7 +151,19 @@ export const isAuthenticated = async (): Promise<boolean> => {
 };
 
 // =====================================================
-// 7️⃣ LOGOUT (LIMPAR TOKEN E WORKSPACE)
+// 🔧 FUNÇÃO AUXILIAR PARA BUSCAR WORKSPACE POR EMAIL
+// =====================================================
+export const getWorkspaceByEmail = async (email: string) => {
+  try {
+    return await apiCall(`/workspaces/email/${email}`, 'GET');
+  } catch (error) {
+    console.error('Erro ao buscar workspace por email:', error);
+    throw error;
+  }
+};
+
+// =====================================================
+// 7️⃣ OBTER WORKSPACES DO USUÁRIO LOGADO
 // =====================================================
 export const logout = async (): Promise<void> => {
   try {

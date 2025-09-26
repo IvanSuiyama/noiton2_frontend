@@ -99,7 +99,7 @@ const CadWorkspace: React.FC<Props> = ({navigation}) => {
         emails: emailsComCriador, // Enviar a lista de emails incluindo o criador
       });
 
-      // Definir o workspace recém-criado como ativo
+      // Definir o workspace recém-criado como ativo (id e nome)
       if (response && response.id_workspace) {
         await setActiveWorkspace(response.id_workspace, formData.nome || 'Workspace');
       }
@@ -158,6 +158,9 @@ const CadWorkspace: React.FC<Props> = ({navigation}) => {
               onChangeText={text => updateField('nome', text)}
               autoCapitalize="words"
               editable={!loading}
+              keyboardType="default"
+              autoCorrect={true}
+              // Permite acentos e caracteres especiais normalmente
             />
             {errors.nome && <Text style={styles.errorText}>{errors.nome}</Text>}
           </View>

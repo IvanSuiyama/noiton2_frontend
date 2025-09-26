@@ -1,4 +1,7 @@
 import React, {useState, useEffect} from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { RootStackParamList } from '../router';
 import {
   View,
   Text,
@@ -42,6 +45,7 @@ const FREQUENCIAS = [
 ];
 
 const CadTarefa: React.FC = () => {
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [formData, setFormData] = useState<FormData>({
     titulo: '',
     descricao: '',
@@ -283,6 +287,8 @@ const CadTarefa: React.FC = () => {
               onChangeText={text => updateField('titulo', text)}
               autoCapitalize="sentences"
               editable={!loading}
+              keyboardType="default"
+              autoCorrect={true}
             />
             {errors.titulo && (
               <Text style={styles.errorText}>{errors.titulo}</Text>
@@ -302,6 +308,8 @@ const CadTarefa: React.FC = () => {
               numberOfLines={4}
               textAlignVertical="top"
               editable={!loading}
+              keyboardType="default"
+              autoCorrect={true}
             />
           </View>
 
@@ -320,6 +328,8 @@ const CadTarefa: React.FC = () => {
                 updateField('data_fim', formatarDataDoInput(text))
               }
               editable={!loading}
+              keyboardType="default"
+              autoCorrect={true}
             />
             {errors.data_fim && (
               <Text style={styles.errorText}>{errors.data_fim}</Text>
@@ -556,6 +566,15 @@ const CadTarefa: React.FC = () => {
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
+                style={styles.modalCreateButton}
+                onPress={() => {
+                  setModalCategoria(false);
+                  // Pequeno delay para evitar conflito visual do modal
+                  setTimeout(() => navigation.navigate('CadastroCategoria'), 200);
+                }}>
+                <Text style={styles.modalCreateButtonText}>Criar nova categoria</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.modalConfirmButton}
                 onPress={() => setModalCategoria(false)}>
                 <Text style={styles.modalConfirmButtonText}>Confirmar</Text>
@@ -617,6 +636,18 @@ const CadTarefa: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  modalCreateButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  modalCreateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a', // Fundo escuro padronizado

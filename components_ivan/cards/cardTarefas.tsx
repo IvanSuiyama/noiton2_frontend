@@ -27,6 +27,7 @@ interface CardTarefasProps {
 }
 
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
+import { getActiveWorkspaceName } from '../../services/authService';
 
 // Usar a interface padrão do projeto
 interface Tarefa extends TarefaMultiplaInterface {
@@ -69,6 +70,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation }) => {
   const [showFiltroModal, setShowFiltroModal] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({});
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [workspaceInfo, setWorkspaceInfo] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -88,15 +90,16 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation }) => {
       const id = await getActiveWorkspaceId();
       const email = await getUserEmail();
       const userId = await getUserId();
-      
+      const name = await getActiveWorkspaceName();
       setWorkspaceId(id);
+      setWorkspaceName(name || '');
       setUserEmail(email || '');
       setCurrentUserId(userId);
 
-      // Buscar informações do workspace para saber se é de equipe
-      if (id) {
+      // Buscar informações do workspace pelo nome (rota correta)
+      if (name) {
         try {
-          const workspaceData = await apiCall(`/workspaces/${id}`, 'GET');
+          const workspaceData = await apiCall(`/workspaces/nome/${encodeURIComponent(name)}`, 'GET');
           setWorkspaceInfo(workspaceData);
         } catch (error) {
           console.error('Erro ao obter informações do workspace:', error);
