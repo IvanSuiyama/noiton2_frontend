@@ -16,6 +16,7 @@ import HomeCard from '../cards/HomeCard';
 import CardTarefas from '../cards/cardTarefas';
 import CardTarefasRecorrentes from '../cards/cardTarefasRecorrentes';
 
+
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
 type Props = {
@@ -28,7 +29,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'tarefas' | 'recorrentes'>('home');
 
   useEffect(() => {
-    // Definir data atual
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = {
       weekday: 'long',
@@ -41,7 +41,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Aqui você pode recarregar dados quando necessário
     setTimeout(() => {
       setRefreshing(false);
     }, 1000);
@@ -100,22 +99,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Conteúdo dos Cards baseado na Tab Ativa */}
+      {/* Conteúdo Principal com Scroll */}
       <ScrollView
         style={styles.mainContent}
-        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="rgba(108, 117, 125, 0.8)"
-            colors={['rgba(108, 117, 125, 0.8)']}
+            colors={['#ffffff']}
+            tintColor="#ffffff"
           />
-        }>
+        }
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.cardContainer}>
           {renderTabContent()}
         </View>
-        
         {/* Espaçamento inferior */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
@@ -129,7 +128,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
   },
   
-  // Header Superior
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -139,7 +137,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   
-  // Cabeçalho com Data
   dateHeader: {
     paddingHorizontal: 16,
     paddingVertical: 20,
@@ -153,7 +150,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Menu de Navegação (Tabs)
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: '#2a2a2a',
@@ -190,14 +186,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // Conteúdo Principal
   mainContent: {
     flex: 1,
     backgroundColor: '#1a1a1a',
   },
 
+  scrollContent: {
+    flexGrow: 1,
+  },
+
   cardContainer: {
     padding: 16,
+    flex: 1,
   },
   
   bottomSpacing: {

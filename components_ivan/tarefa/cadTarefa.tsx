@@ -289,6 +289,8 @@ const CadTarefa: React.FC = () => {
               editable={!loading}
               keyboardType="default"
               autoCorrect={true}
+              importantForAutofill="yes"
+              autoComplete="off"
             />
             {errors.titulo && (
               <Text style={styles.errorText}>{errors.titulo}</Text>
@@ -310,6 +312,8 @@ const CadTarefa: React.FC = () => {
               editable={!loading}
               keyboardType="default"
               autoCorrect={true}
+              importantForAutofill="yes"
+              autoComplete="off"
             />
           </View>
 
@@ -330,6 +334,8 @@ const CadTarefa: React.FC = () => {
               editable={!loading}
               keyboardType="default"
               autoCorrect={true}
+              importantForAutofill="yes"
+              autoComplete="off"
             />
             {errors.data_fim && (
               <Text style={styles.errorText}>{errors.data_fim}</Text>
@@ -512,75 +518,80 @@ const CadTarefa: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setModalCategoria(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContentCategoria}>
             <Text style={styles.modalTitle}>Selecione a Categoria</Text>
-            <TouchableOpacity
-              style={[
-                styles.modalItem,
-                formData.categorias_selecionadas.length === 0 && styles.modalItemSelected,
-              ]}
-              onPress={() => {
-                updateField('categorias_selecionadas', []);
-                setModalCategoria(false);
-              }}>
-              <Text
-                style={[
-                  styles.modalItemText,
-                  formData.categorias_selecionadas.length === 0 && styles.modalItemTextSelected,
-                ]}>
-                Limpar categorias
-              </Text>
-            </TouchableOpacity>
-            <FlatList
-              data={categoriasDisponiveis}
-              keyExtractor={item => item.id_categoria.toString()}
-              renderItem={({item}) => (
-                <TouchableOpacity
-                  style={[
-                    styles.modalItem,
-                    formData.categorias_selecionadas.includes(item.id_categoria) &&
-                      styles.modalItemSelected,
-                  ]}
-                  onPress={() => toggleCategoria(item.id_categoria)}>
-                  <View style={styles.categoriaItem}>
-                    <View
-                      style={[
-                        styles.categoriaColor,
-                        {backgroundColor: item.cor},
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.modalItemText,
-                        formData.categorias_selecionadas.includes(item.id_categoria) &&
-                          styles.modalItemTextSelected,
-                      ]}>
-                      {item.nome}
-                    </Text>
-                    {formData.categorias_selecionadas.includes(item.id_categoria) && (
-                      <Text style={styles.checkIcon}>✓</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-            <View style={styles.modalButtons}>
+            <View style={styles.categoriaListContainer}>
               <TouchableOpacity
-                style={styles.modalCreateButton}
+                style={[
+                  styles.modalItem,
+                  formData.categorias_selecionadas.length === 0 && styles.modalItemSelected,
+                ]}
+                onPress={() => {
+                  updateField('categorias_selecionadas', []);
+                  setModalCategoria(false);
+                }}>
+                <Text
+                  style={[
+                    styles.modalItemText,
+                    formData.categorias_selecionadas.length === 0 && styles.modalItemTextSelected,
+                  ]}>
+                  Limpar categorias
+                </Text>
+              </TouchableOpacity>
+              <FlatList
+                data={categoriasDisponiveis}
+                keyExtractor={item => item.id_categoria.toString()}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalItem,
+                      formData.categorias_selecionadas.includes(item.id_categoria) &&
+                        styles.modalItemSelected,
+                    ]}
+                    onPress={() => toggleCategoria(item.id_categoria)}>
+                    <View style={styles.categoriaItem}>
+                      <View
+                        style={[
+                          styles.categoriaColor,
+                          {backgroundColor: item.cor},
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.modalItemText,
+                          formData.categorias_selecionadas.includes(item.id_categoria) &&
+                            styles.modalItemTextSelected,
+                        ]}>
+                        {item.nome}
+                      </Text>
+                      {formData.categorias_selecionadas.includes(item.id_categoria) && (
+                        <Text style={styles.checkIcon}>✓</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={{paddingBottom: 8}}
+                style={{flexGrow: 0}}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={<Text style={{color:'#fff',textAlign:'center',marginTop:12}}>Nenhuma categoria encontrada</Text>}
+              />
+            </View>
+            <View style={styles.modalButtonsCategoriaCol}>
+              <TouchableOpacity
+                style={styles.modalCreateButtonSmall}
                 onPress={() => {
                   setModalCategoria(false);
-                  // Pequeno delay para evitar conflito visual do modal
                   setTimeout(() => navigation.navigate('CadastroCategoria'), 200);
                 }}>
                 <Text style={styles.modalCreateButtonText}>Criar nova categoria</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalConfirmButton}
+                style={styles.modalConfirmButtonSmall}
                 onPress={() => setModalCategoria(false)}>
                 <Text style={styles.modalConfirmButtonText}>Confirmar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalCloseButton}
+                style={styles.modalCloseButtonSmall}
                 onPress={() => setModalCategoria(false)}>
                 <Text style={styles.modalCloseButtonText}>Fechar</Text>
               </TouchableOpacity>
@@ -636,16 +647,78 @@ const CadTarefa: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  modalCreateButton: {
+  modalContentCategoria: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 18,
+    width: '92%',
+    maxWidth: 420,
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: '#404040',
+    alignSelf: 'center',
+    justifyContent: 'flex-start',
+  },
+  categoriaListContainer: {
+    flexGrow: 1,
+    minHeight: 80,
+    maxHeight: 220,
+    marginBottom: 12,
+  },
+  modalButtonsCategoriaCol: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 8,
+    marginTop: 8,
+  },
+  modalCreateButtonSmall: {
     backgroundColor: '#007bff',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     alignItems: 'center',
+    marginBottom: 4,
   },
   modalCreateButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  modalConfirmButtonSmall: {
+    backgroundColor: '#28a745',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modalConfirmButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  modalCloseButtonSmall: {
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    minWidth: 80,
+  },
+  modalCloseButton: {
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    minWidth: 90,
+    marginTop: 8,
+  },
+  modalCloseButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
     fontWeight: 'bold',
   },
   container: {
@@ -821,18 +894,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: 'bold',
   },
-  modalCloseButton: {
-    backgroundColor: '#dc3545', // Vermelho para cancelar
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  modalCloseButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   categoriaItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -854,19 +915,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 16,
   },
-  modalConfirmButton: {
-    backgroundColor: '#28a745',
-    borderRadius: 8,
-    padding: 12,
-    flex: 1,
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  modalConfirmButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  // ...existing code...
 });
 
 export default CadTarefa;

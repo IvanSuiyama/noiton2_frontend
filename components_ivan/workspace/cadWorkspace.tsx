@@ -196,16 +196,6 @@ const CadWorkspace: React.FC<Props> = ({navigation}) => {
             </View>
           )}
 
-          {/* Informações sobre membros */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoIcon}>👑</Text>
-            <View style={styles.infoTextContainer}>
-              <Text style={styles.infoTitle}>Membro Automático</Text>
-              <Text style={styles.infoText}>
-                Como criador, você será automaticamente adicionado como membro do workspace: {formData.criador}
-              </Text>
-            </View>
-          </View>
 
           {/* Botão Cadastrar */}
           <TouchableOpacity

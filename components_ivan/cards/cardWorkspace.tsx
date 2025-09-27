@@ -24,15 +24,11 @@ interface CardWorkspaceProps {
 }
 
 const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
-  // Estilo do lápis igual ao do card de usuário
+  // Estilo do lápis igual ao botão de criar novo workspace (cinza)
   const pencilIconStyle = {
-    fontSize: 20,
-    color: '#fff700',
-    textShadowColor: '#fff700',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-    fontWeight: 'bold' as 'bold',
-    opacity: 1,
+    fontSize: 18,
+    color: 'rgba(108, 117, 125, 0.9)',
+    marginRight: 12,
   };
   const [workspaceName, setWorkspaceName] = useState('');
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
@@ -171,6 +167,17 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation }) => {
               )}
             />
             
+            {/* Linha separadora */}
+            <View style={{ borderBottomWidth: 1, borderBottomColor: '#3a3a3a', marginHorizontal: 20, marginTop: 8, marginBottom: 8 }} />
+
+            {/* Botão Editar Workspace Atual */}
+            <TouchableOpacity
+              style={styles.createWorkspaceButton}
+              onPress={() => handleEditWorkspace(workspaceName)}>
+              <Text style={pencilIconStyle}>✏️</Text>
+              <Text style={styles.createWorkspaceText}>Editar workspace atual</Text>
+            </TouchableOpacity>
+
             {/* Botão Criar Novo Workspace */}
             <TouchableOpacity
               style={styles.createWorkspaceButton}

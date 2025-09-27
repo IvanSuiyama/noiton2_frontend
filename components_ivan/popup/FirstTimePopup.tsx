@@ -70,10 +70,6 @@ const FirstTimePopup: React.FC<Props> = ({
               onPress={onCreateWorkspace}>
               <Text style={styles.createButtonText}>Criar Workspace</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.skipButton} onPress={onClose}>
-              <Text style={styles.skipButtonText}>Pular por agora</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -167,15 +163,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  skipButton: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  skipButtonText: {
-    color: '#6c757d',
-    fontSize: 16,
-  },
+  }
 });
 
 export default FirstTimePopup;

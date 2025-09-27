@@ -80,10 +80,10 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    if (workspaceId) {
+    if (workspaceId && workspaceInfo && userEmail) {
       carregarTarefas();
     }
-  }, [workspaceId]);
+  }, [workspaceId, workspaceInfo, userEmail]);
 
   const initializeWorkspace = async () => {
     try {
@@ -205,25 +205,21 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation }) => {
       // Aplicar todos os filtros de validação
       const tarefasFiltradas = dadosTarefas
         .filter(tarefa => {
+          // 0. Garante que a tarefa pertence ao workspace atual
+          if (tarefa.id_workspace !== workspaceId) {
+            return false;
+          }
           // 1. Não pode ser recorrente
           if (tarefa.recorrente) {
             return false;
           }
-          
-          // 2. Se não há filtros específicos, não mostrar tarefas concluídas nas 10 mais recentes
-          if (!filtrosCustom || Object.keys(filtrosCustom).length === 0) {
-            if (tarefa.concluida) {
-              return false;
-            }
-          }
-          
+          // 2. Mostrar todas as tarefas não recorrentes do workspace ativo, inclusive concluídas, se não houver filtro
           // 3. Se há filtro de status "concluido", mostrar apenas concluídas
           if (filtrosCustom?.status === 'concluido') {
             if (!tarefa.concluida) {
               return false;
             }
           }
-          
           // 4. Validar permissões do usuário
           return podeVerTarefa(tarefa);
         })

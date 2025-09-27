@@ -212,178 +212,62 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
         {/* Resumo de Estatísticas */}
         <View style={styles.summarySection}>
           <Text style={styles.sectionTitle}>📊 Resumo Geral</Text>
-          
           <View style={styles.statsContainer}>
             <TouchableOpacity 
               style={styles.statItem}
               onPress={() => handleNavigation('Home')} // Navegar para tab tarefas
             >
-              <Text style={[styles.statNumber, { color: '#ffc107' }]}>
+              <Text style={[styles.statNumber, { color: '#ffc107' }]}> 
                 {stats.tarefasPendentes}
               </Text>
               <Text style={styles.statLabel}>Pendentes</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity 
               style={styles.statItem}
               onPress={() => handleNavigation('Home')} // Navegar para tab tarefas
             >
-              <Text style={[styles.statNumber, { color: '#28a745' }]}>
+              <Text style={[styles.statNumber, { color: '#28a745' }]}> 
                 {stats.tarefasConcluidasHoje}
               </Text>
               <Text style={styles.statLabel}>Hoje</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity 
               style={styles.statItem}
               onPress={() => handleNavigation('Home')} // Navegar para tab tarefas
             >
-              <Text style={[styles.statNumber, { color: '#17a2b8' }]}>
+              <Text style={[styles.statNumber, { color: '#17a2b8' }]}> 
                 {stats.tarefasEmProgresso}
               </Text>
               <Text style={styles.statLabel}>Em Andamento</Text>
             </TouchableOpacity>
           </View>
-
           <View style={styles.statsSecondRow}>
             <TouchableOpacity 
               style={styles.statItem}
               onPress={() => handleNavigation('Home')} // Navegar para tab recorrentes
             >
-              <Text style={[styles.statNumber, { color: '#6f42c1' }]}>
+              <Text style={[styles.statNumber, { color: '#6f42c1' }]}> 
                 {stats.tarefasRecorrentes}
               </Text>
               <Text style={styles.statLabel}>Recorrentes</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity 
               style={styles.statItem}
               onPress={() => handleNavigation('Home')}
             >
-              <Text style={[styles.statNumber, { color: '#dc3545' }]}>
+              <Text style={[styles.statNumber, { color: '#dc3545' }]}> 
                 {stats.tarefasAtrasadas}
               </Text>
               <Text style={styles.statLabel}>Atrasadas</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity 
               style={styles.statItem}
               onPress={() => handleNavigation('Home')}
             >
-              <Text style={[styles.statNumber, { color: '#6c757d' }]}>
+              <Text style={[styles.statNumber, { color: '#6c757d' }]}> 
                 {stats.totalTarefas}
               </Text>
               <Text style={styles.statLabel}>Total</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Tarefas para Hoje */}
-        <View style={styles.todaySection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>� Prioridade Hoje</Text>
-            {tarefasHoje.length > 0 && (
-              <TouchableOpacity onPress={() => handleNavigation('CadastroTarefa')}>
-                <Text style={styles.sectionAction}>+ Nova</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          {tarefasHoje.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyText}>Nenhuma tarefa prioritária</Text>
-              <Text style={styles.emptySubtext}>
-                Você está em dia com suas tarefas!
-              </Text>
-              <TouchableOpacity 
-                style={styles.addTaskButton}
-                onPress={() => handleNavigation('CadastroTarefa')}
-              >
-                <Text style={styles.addTaskButtonText}>➕ Criar Tarefa</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.tasksContainer}>
-              {tarefasHoje.map((tarefa, index) => (
-                <TouchableOpacity
-                  key={tarefa.id_tarefa}
-                  style={styles.taskItem}
-                  onPress={() => handleNavigation('VisualizaTarefa', { id_tarefa: tarefa.id_tarefa })}
-                >
-                  <View style={styles.taskContent}>
-                    <View style={styles.taskInfo}>
-                      <Text style={styles.taskTitle} numberOfLines={1}>
-                        {tarefa.titulo}
-                      </Text>
-                      {tarefa.descricao && (
-                        <Text style={styles.taskDescription} numberOfLines={1}>
-                          {tarefa.descricao}
-                        </Text>
-                      )}
-                      <View style={styles.taskMeta}>
-                        <View style={[
-                          styles.priorityBadge, 
-                          { backgroundColor: getPrioridadeCor(tarefa.prioridade) }
-                        ]}>
-                          <Text style={styles.priorityText}>
-                            {tarefa.prioridade.toUpperCase()}
-                          </Text>
-                        </View>
-                        {tarefa.data_fim && (
-                          <Text style={styles.taskDate}>
-                            📅 {formatarData(tarefa.data_fim)}
-                          </Text>
-                        )}
-                        {tarefa.recorrente && (
-                          <Text style={styles.taskRecurring}>🔄</Text>
-                        )}
-                      </View>
-                    </View>
-                    <View style={styles.taskArrow}>
-                      <Text style={styles.arrowText}>›</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-              
-              <TouchableOpacity 
-                style={styles.viewAllButton}
-                onPress={() => handleNavigation('Home')} // Navegar para tab de tarefas
-              >
-                <Text style={styles.viewAllButtonText}>Ver Todas as Tarefas</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Acesso Rápido */}
-        <View style={styles.quickAccessSection}>
-          <Text style={styles.sectionTitle}>� Acesso Rápido</Text>
-          
-          <View style={styles.quickActionsContainer}>
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => handleNavigation('CadastroTarefa')}
-            >
-              <Text style={styles.quickActionIcon}>📝</Text>
-              <Text style={styles.quickActionText}>Nova Tarefa</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => handleNavigation('CadastroCategoria')}
-            >
-              <Text style={styles.quickActionIcon}>🏷️</Text>
-              <Text style={styles.quickActionText}>Nova Categoria</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => handleNavigation('CadastroWorkspace')}
-            >
-              <Text style={styles.quickActionIcon}>🏢</Text>
-              <Text style={styles.quickActionText}>Workspace</Text>
             </TouchableOpacity>
           </View>
         </View>
