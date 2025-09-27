@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -51,6 +52,7 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
     }
   };
 
+
   const handleEditUser = () => {
     setShowUserModal(false);
     navigation.navigate('EditUsuario', { userEmail });
@@ -59,6 +61,20 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
   const handleDeleteUser = () => {
     setShowUserModal(false);
     navigation.navigate('DellUser', { userEmail });
+  };
+
+  // Botão de logoff: limpa todo o cache e volta para tela de login
+  const handleLogoff = async () => {
+    setShowUserModal(false);
+    try {
+      await AsyncStorage.clear();
+    } catch (e) {
+      // ignore
+    }
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
   };
 
   return (
@@ -111,7 +127,14 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
                 <Text style={styles.actionButtonIcon}>✏️</Text>
                 <Text style={styles.actionButtonText}>Editar Perfil</Text>
               </TouchableOpacity>
-              
+
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={handleLogoff}>
+                <Text style={styles.actionButtonIcon}>🚪</Text>
+                <Text style={styles.actionButtonText}>Sair</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity 
                 style={[styles.actionButton, styles.deleteActionButton]}
                 onPress={handleDeleteUser}>

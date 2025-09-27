@@ -1,4 +1,7 @@
 import React, {useState, useEffect} from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { RootStackParamList } from '../router';
 import {
   View,
   Text,
@@ -17,9 +20,10 @@ import {getUserEmail, apiCall} from '../../services/authService';
 type FormData = Omit<CategoriaInterface, 'id_categoria'>;
 
 const CadCategoria: React.FC = () => {
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [formData, setFormData] = useState<FormData>({
     nome: '',
-    cor: 'rgba(108, 117, 125, 0.8)', // Cor padrão - cinza transparente padronizado
+    cor: '', // cor será definida aleatoriamente no cadastro
     id_workspace: 1, // TODO: Obter do contexto/parâmetro de navegação
   });
   const [loading, setLoading] = useState<boolean>(false);
@@ -47,21 +51,7 @@ const CadCategoria: React.FC = () => {
     inicializarWorkspace();
   }, []);
 
-  // Cores predefinidas para categoria
-  const coresPredefinidas = [
-    '#ff6b6b', // Vermelho
-    '#4ecdc4', // Turquesa
-    '#45b7d1', // Azul claro
-    '#96ceb4', // Verde claro
-    '#feca57', // Amarelo
-    '#ff9ff3', // Rosa
-    '#54a0ff', // Azul
-    '#5f27cd', // Roxo
-    '#00d2d3', // Ciano
-    '#ff9f43', // Laranja
-    '#10ac84', // Verde escuro
-    '#ee5a24', // Laranja escuro
-  ];
+
 
   // Função para validar formulário
   const validarFormulario = (): boolean => {
@@ -80,11 +70,17 @@ const CadCategoria: React.FC = () => {
       return;
     }
 
+    // Seleciona uma cor aleatória
+    const coresPredefinidas = [
+      '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43', '#10ac84', '#ee5a24'
+    ];
+    const corAleatoria = coresPredefinidas[Math.floor(Math.random() * coresPredefinidas.length)];
+
     setLoading(true);
     try {
       await apiCall('/categorias', 'POST', {
         nome: formData.nome,
-        cor: formData.cor,
+        cor: corAleatoria,
         id_workspace: formData.id_workspace,
       });
 
@@ -95,10 +91,15 @@ const CadCategoria: React.FC = () => {
             // Limpar formulário
             setFormData(prev => ({
               nome: '',
-              cor: 'rgba(108, 117, 125, 0.8)', // Manter cor padronizada
-              id_workspace: prev.id_workspace, // Manter workspace atual
+              cor: '',
+              id_workspace: prev.id_workspace,
             }));
             setErrors({});
+            // Redirecionar para Home
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Home' }],
+            });
           },
         },
       ]);
@@ -150,37 +151,7 @@ const CadCategoria: React.FC = () => {
             {errors.nome && <Text style={styles.errorText}>{errors.nome}</Text>}
           </View>
 
-          {/* Seleção de Cor */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Cor da Categoria *</Text>
-            <View style={styles.previewContainer}>
-              <View
-                style={[
-                  styles.colorPreview,
-                  {backgroundColor: formData.cor},
-                ]}
-              />
-              <Text style={styles.colorPreviewText}>{formData.cor}</Text>
-            </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.colorScrollContainer}>
-              {coresPredefinidas.map(cor => (
-                <TouchableOpacity
-                  key={cor}
-                  style={[
-                    styles.colorOption,
-                    {backgroundColor: cor},
-                    formData.cor === cor && styles.colorOptionSelected,
-                  ]}
-                  onPress={() => updateField('cor', cor)}
-                  disabled={loading}
-                />
-              ))}
-            </ScrollView>
-          </View>
 
           {/* Botão Cadastrar */}
           <TouchableOpacity

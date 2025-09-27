@@ -15,7 +15,7 @@ import CardUser from '../cards/cardUser';
 import HomeCard from '../cards/HomeCard';
 import CardTarefas from '../cards/cardTarefas';
 import CardTarefasRecorrentes from '../cards/cardTarefasRecorrentes';
-
+import CardMembros from '../cards/cardMembros';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -46,6 +46,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }, 1000);
   };
 
+
+  // CardMembros agora busca tudo sozinho
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'home':
@@ -63,8 +66,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header Superior com Cards */}
       <View style={styles.topHeader}>
-        <CardWorkspace navigation={navigation} />
-        <CardUser navigation={navigation} />
+  <CardWorkspace navigation={navigation} />
+ <View style={{ marginRight: 70 }}>
+  <CardMembros />
+</View>
+  <CardUser navigation={navigation} />
       </View>
 
       {/* Cabeçalho com Data Atual */}
@@ -94,7 +100,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={[styles.tab, activeTab === 'recorrentes' && styles.activeTab]}
           onPress={() => setActiveTab('recorrentes')}>
           <Text style={[styles.tabText, activeTab === 'recorrentes' && styles.activeTabText]}>
-            🔄 Recorrentes
+            ♻️ Recorrentes
           </Text>
         </TouchableOpacity>
       </View>
@@ -131,10 +137,12 @@ const styles = StyleSheet.create({
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: '#1a1a1a',
     gap: 12,
+    minHeight: 80,
   },
   
   dateHeader: {
