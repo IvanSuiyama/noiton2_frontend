@@ -505,8 +505,8 @@ const CardTarefasRecorrentes: React.FC<CardTarefasRecorrentesProps> = ({ navigat
                         setFiltros(prev => ({
                           ...prev,
                           prioridade: prev.prioridade === key ? undefined : key,
-                        }))
-                      }>
+                        }))}
+                      >
                       <Text
                         style={[
                           styles.filtroOptionText,
@@ -516,9 +516,9 @@ const CardTarefasRecorrentes: React.FC<CardTarefasRecorrentesProps> = ({ navigat
                       </Text>
                     </TouchableOpacity>
                   ))}
+                
                 </View>
               </View>
-
               {/* NOVO: Filtro por Recorrência */}
               <View style={styles.filtroSection}>
                 <Text style={styles.filtroLabel}>Recorrência:</Text>

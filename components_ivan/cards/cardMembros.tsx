@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -21,7 +20,7 @@ interface CardMembrosProps {
 
 
 
-const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
+const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados}) => {
   const [novoEmail, setNovoEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [listaMembros, setListaMembros] = useState<string[]>([]);
@@ -32,27 +31,28 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
   const [workspaces, setWorkspaces] = useState<WorkspaceInterface[]>([]);
   const [activeWorkspace, setActiveWorkspaceState] = useState<WorkspaceInterface | null>(null);
 
+  // Função agora é exportada para uso em outras funções
+  const initializeWorkspaceData = async () => {
+    try {
+      const userWorkspaces = await getUserWorkspaces();
+      setWorkspaces(userWorkspaces || []);
+      const activeWorkspaceName = await getActiveWorkspaceName();
+      const workspaceAtivo = userWorkspaces.find((ws: WorkspaceInterface) => ws.nome === activeWorkspaceName) || userWorkspaces[0];
+      setActiveWorkspaceState(workspaceAtivo);
+      setIdWorkspace(workspaceAtivo?.id_workspace || null);
+      setIsEquipe(workspaceAtivo?.equipe || false);
+      setListaMembros(workspaceAtivo?.emails || []);
+      setCriador(workspaceAtivo?.criador || '');
+    } catch (error) {
+      setWorkspaces([]);
+      setActiveWorkspaceState(null);
+      setIdWorkspace(null);
+      setIsEquipe(false);
+      setListaMembros([]);
+      setCriador('');
+    }
+  };
   useEffect(() => {
-    const initializeWorkspaceData = async () => {
-      try {
-        const userWorkspaces = await getUserWorkspaces();
-        setWorkspaces(userWorkspaces || []);
-        const activeWorkspaceName = await getActiveWorkspaceName();
-        const workspaceAtivo = userWorkspaces.find((ws: WorkspaceInterface) => ws.nome === activeWorkspaceName) || userWorkspaces[0];
-        setActiveWorkspaceState(workspaceAtivo);
-        setIdWorkspace(workspaceAtivo?.id_workspace || null);
-        setIsEquipe(workspaceAtivo?.equipe || false);
-        setListaMembros(workspaceAtivo?.emails || []);
-        setCriador(workspaceAtivo?.criador || '');
-      } catch (error) {
-        setWorkspaces([]);
-        setActiveWorkspaceState(null);
-        setIdWorkspace(null);
-        setIsEquipe(false);
-        setListaMembros([]);
-        setCriador('');
-      }
-    };
     initializeWorkspaceData();
   }, []);
 
@@ -61,7 +61,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
   const validarEmail = async (email: string) => {
     try {
       const emailcadastrado = await apiCall(`/usuarios/email/${email}`, 'GET');
-      return emailcadastrado.exists;
+      return emailcadastrado;
     } catch {
       console.log('Email não cadastrado no aplicativo.');
       return false;
@@ -69,7 +69,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
   };
 
   const adicionarMembro = async () => {
-  if (!idWorkspace) { return; }
+    if (!idWorkspace) { return; }
     const emailValido = await validarEmail(novoEmail);
     if (!emailValido) {
       Alert.alert('Email inválido', 'Este email não possui conta cadastrada em nosso sistema.');
@@ -82,10 +82,9 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
     setLoading(true);
     try {
       await apiCall(`/workspaces/${idWorkspace}/adicionar-email`, 'POST', { emailNovo: novoEmail });
-      const novos = [...listaMembros, novoEmail];
-      setListaMembros(novos);
       setNovoEmail('');
-      onMembrosAtualizados && onMembrosAtualizados(novos);
+      await initializeWorkspaceData();
+      onMembrosAtualizados && onMembrosAtualizados(listaMembros);
       Alert.alert('Sucesso', 'Membro adicionado!');
     } catch (error: any) {
       Alert.alert('Erro', error?.message || 'Erro ao adicionar membro.');
@@ -95,7 +94,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
   };
 
   const removerMembro = async (email: string) => {
-  if (!idWorkspace) { return; }
+    if (!idWorkspace) { return; }
     if (email === criador) {
       Alert.alert('Ação não permitida', 'Não é possível remover o criador do workspace.');
       return;
@@ -103,9 +102,8 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados }) => {
     setLoading(true);
     try {
       await apiCall(`/workspaces/${idWorkspace}/remover-email`, 'DELETE', { emailRuim: email });
-      const novos = listaMembros.filter(e => e !== email);
-      setListaMembros(novos);
-      onMembrosAtualizados && onMembrosAtualizados(novos);
+      await initializeWorkspaceData();
+      onMembrosAtualizados && onMembrosAtualizados(listaMembros);
       Alert.alert('Sucesso', 'Membro removido!');
     } catch (error: any) {
       Alert.alert('Erro', error?.message || 'Erro ao remover membro.');

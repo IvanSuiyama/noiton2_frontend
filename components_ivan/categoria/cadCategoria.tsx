@@ -14,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import CategoriaInterface from './categoriaInterface';
-import {getUserEmail, apiCall} from '../../services/authService';
+import {getUserEmail, apiCall, getActiveWorkspaceId} from '../../services/authService';
 
 // Tipo baseado na CategoriaInterface, omitindo id_categoria que é gerado no backend
 type FormData = Omit<CategoriaInterface, 'id_categoria'>;
@@ -23,32 +23,33 @@ const CadCategoria: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [formData, setFormData] = useState<FormData>({
     nome: '',
-    cor: '', // cor será definida aleatoriamente no cadastro
-    id_workspace: 1, // TODO: Obter do contexto/parâmetro de navegação
+    cor: '',
+    id_workspace: 1,
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<Partial<Pick<FormData, 'nome'>>>({});
-  const [workspaceAtual, setWorkspaceAtual] = useState<number>(1); // TODO: Implementar seleção de workspace
+  const [workspaceAtual, setWorkspaceAtual] = useState<number>(1);
 
-  // Obter workspace atual ao inicializar o componente
+  // Sempre manter o id do workspace atualizado no formData
   useEffect(() => {
-    const inicializarWorkspace = async () => {
-      try {
-        // TODO: Implementar obtenção do workspace atual
-        // Por enquanto, usar workspace padrão (ID = 1)
-        const workspaceId = 1; // Será obtido do contexto de navegação/parâmetro
-        setWorkspaceAtual(workspaceId);
-        setFormData(prev => ({...prev, id_workspace: workspaceId}));
-      } catch (error) {
-        console.error('Erro ao inicializar workspace:', error);
-        Alert.alert(
-          'Erro',
-          'Erro ao obter dados do workspace.',
-        );
+    let mounted = true;
+    const atualizarWorkspace = async () => {
+      const id = await getActiveWorkspaceId();
+      if (mounted) {
+        setWorkspaceAtual(id || 1);
+        setFormData(prev => ({
+          ...prev,
+          id_workspace: id || 1,
+        }));
       }
     };
-
-    inicializarWorkspace();
+    atualizarWorkspace();
+    // Atualiza periodicamente (a cada 1s)
+    const interval = setInterval(atualizarWorkspace, 1000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
 

@@ -42,6 +42,7 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
 
   useEffect(() => {
     initializeWorkspaceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const initializeWorkspaceData = async () => {

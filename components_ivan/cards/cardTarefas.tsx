@@ -24,6 +24,7 @@ type CardTarefasNavigationProp = StackNavigationProp<RootStackParamList>;
 
 interface CardTarefasProps {
   navigation: CardTarefasNavigationProp;
+  refreshKey?: any;
 }
 
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
@@ -63,7 +64,7 @@ const PRIORIDADE_LABELS = {
   urgente: 'Urgente',
 };
 
-const CardTarefas: React.FC<CardTarefasProps> = ({ navigation }) => {
+const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(false);
   const [palavraChave, setPalavraChave] = useState('');
@@ -75,15 +76,19 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation }) => {
   const [workspaceInfo, setWorkspaceInfo] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
+
+  // Sempre que refreshKey mudar, ou workspaceId/workspaceInfo/userEmail, recarrega tudo
   useEffect(() => {
     initializeWorkspace();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   useEffect(() => {
     if (workspaceId && workspaceInfo && userEmail) {
       carregarTarefas();
     }
-  }, [workspaceId, workspaceInfo, userEmail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, workspaceInfo, userEmail, refreshKey]);
 
   const initializeWorkspace = async () => {
     try {

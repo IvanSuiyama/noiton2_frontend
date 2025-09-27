@@ -14,7 +14,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import WorkspaceInterface from './workspaceInterface';
 import UserInterface from '../usuario/userInterface';
 import SelectUsuario from '../usuario/selectUsuario';
-import { apiCall } from '../../services/authService';
+import { apiCall, setActiveWorkspace } from '../../services/authService';
 
 interface RouteParams {
   workspaceName: string;
@@ -44,14 +44,24 @@ const EditWorkspace: React.FC = () => {
     buscarDadosWorkspace();
   }, []);
 
-  // Busca workspace por nome (apenas para edição)
+  // Busca workspace correto entre todos do usuário logado
   const buscarDadosWorkspace = async () => {
     try {
       setLoadingInitial(true);
-      const response = await apiCall(`/workspaces/nome/${workspaceName}`, 'GET');
-      if (response) {
-        setWorkspace(response);
-        setOriginalName(response.nome);
+      // Busca todos os workspaces do usuário logado
+      const todos = await apiCall(`/workspaces/email/${encodeURIComponent(userEmail)}`, 'GET');
+      // Filtra pelo nome e, se possível, pelo criador
+      let encontrado = null;
+      if (Array.isArray(todos)) {
+        encontrado = todos.find((ws: any) => ws.nome === workspaceName && (ws.criador === userEmail || true));
+        // Se não encontrar pelo criador, pega só pelo nome
+        if (!encontrado) {
+          encontrado = todos.find((ws: any) => ws.nome === workspaceName);
+        }
+      }
+      if (encontrado) {
+        setWorkspace(encontrado);
+        setOriginalName(encontrado.nome);
       } else {
         Alert.alert('Erro', 'Workspace não encontrado');
         navigation.goBack();
@@ -75,13 +85,6 @@ const EditWorkspace: React.FC = () => {
       newErrors.nome = 'Nome deve ter pelo menos 3 caracteres';
     }
 
-    // Validar emails (pelo menos o criador deve estar presente)
-    if (workspace.emails.length === 0) {
-      newErrors.emails = 'Deve ter pelo menos um membro no workspace';
-    } else if (!workspace.emails.includes(workspace.criador)) {
-      newErrors.emails = 'O criador deve estar na lista de membros';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -103,17 +106,18 @@ const EditWorkspace: React.FC = () => {
       // Preparar dados para envio
       const dadosParaEnvio = {
         nome: workspace.nome,
-        equipe: workspace.equipe,
       };
 
-      // Atualiza workspace por nome (rota backend)
+      // Atualiza workspace por ID (rota backend)
       const response = await apiCall(
-        `/workspaces/nome/${originalName}`,
+        `/workspaces/${workspace.id_workspace}`,
         'PUT',
         dadosParaEnvio
       );
 
       if (response) {
+        // Atualiza o nome salvo no AsyncStorage para refletir o novo nome
+        await setActiveWorkspace(workspace.id_workspace || 0, workspace.nome);
         Alert.alert('Sucesso', 'Workspace editado com sucesso!', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -128,40 +132,6 @@ const EditWorkspace: React.FC = () => {
     }
   };
 
-  const handleAdicionarMembro = (user: UserInterface) => {
-    if (!workspace.emails.includes(user.email)) {
-      setWorkspace({
-        ...workspace,
-        emails: [...workspace.emails, user.email],
-      });
-    }
-    setShowUserSelector(false);
-  };
-
-  const handleRemoverMembro = (email: string) => {
-    if (email === workspace.criador) {
-      Alert.alert('Aviso', 'Não é possível remover o criador do workspace');
-      return;
-    }
-
-    Alert.alert(
-      'Confirmar Remoção',
-      `Tem certeza que deseja remover ${email} do workspace?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Remover',
-          style: 'destructive',
-          onPress: () => {
-            setWorkspace({
-              ...workspace,
-              emails: workspace.emails.filter((e) => e !== email),
-            });
-          },
-        },
-      ]
-    );
-  };
 
   if (loadingInitial) {
     return (
@@ -186,25 +156,6 @@ const EditWorkspace: React.FC = () => {
             <View style={styles.readOnlyContainer}>
               <Text style={styles.readOnlyLabel}>Nome:</Text>
               <Text style={styles.readOnlyValue}>{workspace.nome}</Text>
-
-              <Text style={styles.readOnlyLabel}>Tipo:</Text>
-              <Text style={styles.readOnlyValue}>
-                {workspace.equipe
-                  ? 'Workspace em Equipe'
-                  : 'Workspace Individual'}
-              </Text>
-
-              <Text style={styles.readOnlyLabel}>Criador:</Text>
-              <Text style={styles.readOnlyValue}>{workspace.criador}</Text>
-
-              <Text style={styles.readOnlyLabel}>
-                Membros ({workspace.emails.length}):
-              </Text>
-              {workspace.emails.map((email, index) => (
-                <Text key={index} style={styles.readOnlyMemberItem}>
-                  • {email} {email === workspace.criador && '(Criador)'}
-                </Text>
-              ))}
             </View>
 
             <TouchableOpacity
@@ -219,26 +170,6 @@ const EditWorkspace: React.FC = () => {
     );
   }
 
-  if (showUserSelector) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.selectorHeader}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setShowUserSelector(false)}
-          >
-            <Text style={styles.backButtonText}>← Voltar</Text>
-          </TouchableOpacity>
-          <Text style={styles.selectorTitle}>Adicionar Membro</Text>
-        </View>
-        <SelectUsuario
-          onSelectUser={handleAdicionarMembro}
-          excludeEmails={workspace.emails}
-          showActions={false}
-        />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -265,75 +196,6 @@ const EditWorkspace: React.FC = () => {
               placeholderTextColor="#6c757d"
             />
             {errors.nome && <Text style={styles.errorText}>{errors.nome}</Text>}
-          </View>
-
-          {/* Switch Equipe */}
-          <View style={styles.switchContainer}>
-            <View style={styles.switchContent}>
-              <View style={styles.switchTextContainer}>
-                <Text style={styles.switchLabel}>Workspace em Equipe</Text>
-                <Text style={styles.switchDescription}>
-                  {workspace.equipe
-                    ? 'Este workspace permite colaboração entre múltiplos usuários'
-                    : 'Este é um workspace individual para uso pessoal'}
-                </Text>
-              </View>
-              <Switch
-                value={workspace.equipe}
-                onValueChange={(value) =>
-                  setWorkspace({ ...workspace, equipe: value })
-                }
-                trackColor={{ false: '#404040', true: 'rgba(108, 117, 125, 0.8)' }}
-                thumbColor={workspace.equipe ? '#ffffff' : '#6c757d'}
-              />
-            </View>
-          </View>
-
-          {/* Informações do Criador */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoIcon}>👑</Text>
-            <View style={styles.infoTextContainer}>
-              <Text style={styles.infoTitle}>Criador do Workspace</Text>
-              <Text style={styles.infoText}>{workspace.criador}</Text>
-            </View>
-          </View>
-
-          {/* Lista de Membros */}
-          <View style={styles.membersSection}>
-            <View style={styles.membersSectionHeader}>
-              <Text style={styles.membersTitle}>
-                👥 Membros ({workspace.emails.length})
-              </Text>
-              <TouchableOpacity
-                style={styles.addMemberButton}
-                onPress={() => setShowUserSelector(true)}
-              >
-                <Text style={styles.addMemberButtonText}>+ Adicionar</Text>
-              </TouchableOpacity>
-            </View>
-
-            {errors.emails && <Text style={styles.errorText}>{errors.emails}</Text>}
-
-            <View style={styles.membersList}>
-              {workspace.emails.map((email, index) => (
-                <View key={index} style={styles.memberItem}>
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberEmail}>{email}</Text>
-                    {email === workspace.criador && (
-                      <Text style={styles.creatorBadge}>👑 Criador</Text>
-                    )}
-                  </View>
-                  {email !== workspace.criador && (
-                    <TouchableOpacity
-                      style={styles.removeMemberButton}
-                      onPress={() => handleRemoverMembro(email)}
-                    >
-                      <Text style={styles.removeMemberButtonText}>✕</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-            </View>
           </View>
 
           {/* Aviso sobre edição */}

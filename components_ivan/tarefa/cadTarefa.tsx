@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import {CriarTarefaInterface} from './tarefaMultiplaInterface';
 import CategoriaInterface from '../categoria/categoriaInterface';
-import {apiCall} from '../../services/authService';
+import {apiCall, getUserEmail, getUserId, getActiveWorkspaceId} from '../../services/authService';
 
 // Tipo baseado na CriarTarefaInterface
 type FormData = CriarTarefaInterface;
@@ -54,9 +54,9 @@ const CadTarefa: React.FC = () => {
     prioridade: 'media',
     recorrente: false,
     recorrencia: undefined,
-    id_workspace: 1, // TODO: Obter do contexto/parâmetro de navegação
-    id_usuario: 1, // TODO: Obter do contexto do usuário logado
-    responsaveis: [], // TODO: Implementar seleção de responsáveis
+    id_workspace: 1, // Será atualizado ao montar
+    id_usuario: 1, // Será atualizado ao montar
+    responsaveis: [], // Será preenchido ao montar
     categorias_selecionadas: [],
   });
   const [loading, setLoading] = useState<boolean>(false);
@@ -73,6 +73,48 @@ const CadTarefa: React.FC = () => {
   const [modalStatus, setModalStatus] = useState<boolean>(false);
   const [modalCategoria, setModalCategoria] = useState<boolean>(false);
   const [modalFrequencia, setModalFrequencia] = useState<boolean>(false);
+
+  // Sempre manter o id do workspace atualizado no formData
+  useEffect(() => {
+    let mounted = true;
+    const atualizarWorkspace = async () => {
+      const id = await getActiveWorkspaceId();
+      if (mounted) {
+        setWorkspaceAtual(id || 1);
+        setFormData(prev => ({
+          ...prev,
+          id_workspace: id || 1,
+        }));
+      }
+    };
+    atualizarWorkspace();
+    // Atualiza periodicamente (a cada 1s)
+    const interval = setInterval(atualizarWorkspace, 1000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Ao montar, busca id do usuário, email e atualiza formData/responsáveis
+  useEffect(() => {
+    const inicializar = async () => {
+      try {
+        const [userId, userEmail] = await Promise.all([
+          getUserId(),
+          getUserEmail(),
+        ]);
+        setFormData(prev => ({
+          ...prev,
+          id_usuario: userId || 1,
+          responsaveis: userEmail ? [userEmail] : [],
+        }));
+      } catch (error) {
+        // fallback
+      }
+    };
+    inicializar();
+  }, []);
 
   // Obter categorias do workspace ao inicializar o componente
   useEffect(() => {
@@ -122,7 +164,17 @@ const CadTarefa: React.FC = () => {
 
     setLoading(true);
     try {
-      // Preparar dados para envio (sem as categorias)
+      // Buscar email e id do usuário logado para garantir
+      const [userId, userEmail] = await Promise.all([
+        getUserId(),
+        getUserEmail(),
+      ]);
+
+      // Se não houver responsáveis, usar o usuário logado
+      const responsaveis = formData.responsaveis && formData.responsaveis.length > 0
+        ? formData.responsaveis
+        : userEmail ? [userEmail] : [];
+
       const dadosEnvio = {
         titulo: formData.titulo,
         descricao: formData.descricao,
@@ -132,8 +184,8 @@ const CadTarefa: React.FC = () => {
         recorrente: formData.recorrente,
         recorrencia: formData.recorrente ? formData.recorrencia : null,
         id_workspace: formData.id_workspace,
-        id_usuario: formData.id_usuario,
-        responsaveis: formData.responsaveis,
+        id_usuario: userId || formData.id_usuario,
+        responsaveis,
       };
 
       // Criar a tarefa primeiro
@@ -162,8 +214,8 @@ const CadTarefa: React.FC = () => {
               recorrente: false,
               recorrencia: undefined,
               id_workspace: workspaceAtual,
-              id_usuario: 1, // TODO: Obter do contexto
-              responsaveis: [],
+              id_usuario: userId || 1,
+              responsaveis: userEmail ? [userEmail] : [],
               categorias_selecionadas: [],
             });
             setErrors({});

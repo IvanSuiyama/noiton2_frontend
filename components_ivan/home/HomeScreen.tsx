@@ -12,8 +12,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
 import CardWorkspace from '../cards/cardWorkspace';
 import CardUser from '../cards/cardUser';
-import HomeCard from '../cards/HomeCard';
+// import HomeCard from '../cards/HomeCard';
 import CardTarefas from '../cards/cardTarefas';
+import { getActiveWorkspaceId } from '../../services/authService';
 import CardTarefasRecorrentes from '../cards/cardTarefasRecorrentes';
 import CardMembros from '../cards/cardMembros';
 
@@ -27,6 +28,25 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'tarefas' | 'recorrentes'>('home');
+  const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState<number | null>(null);
+
+  // Sempre que a tela for exibida, pega o workspace ativo
+  useEffect(() => {
+    const fetchWorkspaceId = async () => {
+      const id = await getActiveWorkspaceId();
+      setWorkspaceRefreshKey(id);
+    };
+    fetchWorkspaceId();
+  }, []);
+
+  // Se workspace mudar (por navegação, troca, etc), atualiza a chave
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const id = await getActiveWorkspaceId();
+      setWorkspaceRefreshKey(prev => (prev !== id ? id : prev));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const now = new Date();
@@ -51,14 +71,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'home':
-        return <HomeCard navigation={navigation} />;
+      // case 'home':
+      //   return <HomeCard navigation={navigation} />;
       case 'tarefas':
-        return <CardTarefas navigation={navigation} />;
+        return <CardTarefas navigation={navigation} refreshKey={workspaceRefreshKey} />;
       case 'recorrentes':
         return <CardTarefasRecorrentes navigation={navigation} />;
       default:
-        return <HomeCard navigation={navigation} />;
+        return <CardTarefas navigation={navigation} refreshKey={workspaceRefreshKey} />;
     }
   };
 
@@ -66,8 +86,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header Superior com Cards */}
       <View style={styles.topHeader}>
-  <CardWorkspace navigation={navigation} />
- <View style={{ marginRight: 70 }}>
+  <CardWorkspace navigation={navigation}  />
+ <View style={{ marginRight: 90 }}>
   <CardMembros />
 </View>
   <CardUser navigation={navigation} />
@@ -80,14 +100,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Menu de Navegação Horizontal */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'home' && styles.activeTab]}
-          onPress={() => setActiveTab('home')}>
-          <Text style={[styles.tabText, activeTab === 'home' && styles.activeTabText]}>
-            🏠 Home
-          </Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.tab, activeTab === 'tarefas' && styles.activeTab]}
           onPress={() => setActiveTab('tarefas')}>
