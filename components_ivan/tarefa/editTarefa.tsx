@@ -37,7 +37,6 @@ interface TarefaData {
   recorrente: boolean;
   recorrencia?: 'diaria' | 'semanal' | 'mensal';
   id_workspace: number;
-  responsaveis: string[];
   categorias_selecionadas: number[]; // Array de IDs das categorias (relacionamento via tarefa_categoria)
 }
 
@@ -75,7 +74,6 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
     recorrente: false,
     recorrencia: undefined,
     id_workspace: 0,
-    responsaveis: [],
     categorias_selecionadas: [],
   });
   const [tarefaOriginal, setTarefaOriginal] = useState<TarefaData | null>(null);
@@ -133,7 +131,6 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
         recorrente: tarefa.recorrente || false,
         recorrencia: tarefa.recorrencia,
         id_workspace: tarefa.id_workspace,
-        responsaveis: tarefa.responsaveis || [],
         categorias_selecionadas: categoriasTarefa,
       };
 
@@ -201,7 +198,6 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
         prioridade: formData.prioridade,
         recorrente: formData.recorrente,
         recorrencia: formData.recorrente ? formData.recorrencia : null,
-        responsaveis: formData.responsaveis,
       };
 
       // Atualizar dados básicos da tarefa
@@ -632,7 +628,7 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
                     <View
                       style={[
                         styles.categoriaColor,
-                        {backgroundColor: item.cor},
+                        {backgroundColor: '#888'},
                       ]}
                     />
                     <Text

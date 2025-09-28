@@ -11,7 +11,6 @@ export default interface TarefaMultiplaInterface {
   recorrencia?: 'diaria' | 'semanal' | 'mensal';
   id_workspace: number;
   id_usuario: number;
-  responsaveis: string[]; // Array de emails dos responsáveis
   categorias: {
     id_categoria: number;
     nome: string;
@@ -30,7 +29,6 @@ export interface CriarTarefaInterface {
   recorrencia?: 'diaria' | 'semanal' | 'mensal';
   id_workspace: number;
   id_usuario: number;
-  responsaveis: string[]; // Array de emails dos responsáveis
   categorias_selecionadas: number[]; // Array de IDs das categorias (relacionamento via tarefa_categoria)
 }
 
@@ -43,6 +41,5 @@ export interface AtualizarTarefaInterface {
   prioridade?: 'baixa' | 'media' | 'alta' | 'urgente';
   recorrente?: boolean;
   recorrencia?: 'diaria' | 'semanal' | 'mensal';
-  responsaveis?: string[]; // Array de emails dos responsáveis
   categorias_selecionadas?: number[]; // Array de IDs das categorias (relacionamento via tarefa_categoria)
 }

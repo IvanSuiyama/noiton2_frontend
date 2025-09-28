@@ -15,7 +15,6 @@ import CardUser from '../cards/cardUser';
 // import HomeCard from '../cards/HomeCard';
 import CardTarefas from '../cards/cardTarefas';
 import { getActiveWorkspaceId } from '../../services/authService';
-import CardTarefasRecorrentes from '../cards/cardTarefasRecorrentes';
 import CardMembros from '../cards/cardMembros';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -27,7 +26,7 @@ type Props = {
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'tarefas' | 'recorrentes'>('home');
+  // Removido controle de abas, sempre mostra tarefas
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState<number | null>(null);
 
   // Sempre que a tela for exibida, pega o workspace ativo
@@ -67,20 +66,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
 
-  // CardMembros agora busca tudo sozinho
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      // case 'home':
-      //   return <HomeCard navigation={navigation} />;
-      case 'tarefas':
-        return <CardTarefas navigation={navigation} refreshKey={workspaceRefreshKey} />;
-      case 'recorrentes':
-        return <CardTarefasRecorrentes navigation={navigation} />;
-      default:
-        return <CardTarefas navigation={navigation} refreshKey={workspaceRefreshKey} />;
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -98,25 +83,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.dateText}>{currentDate}</Text>
       </View>
 
-      {/* Menu de Navegação Horizontal */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'tarefas' && styles.activeTab]}
-          onPress={() => setActiveTab('tarefas')}>
-          <Text style={[styles.tabText, activeTab === 'tarefas' && styles.activeTabText]}>
-            📋 Tarefas
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'recorrentes' && styles.activeTab]}
-          onPress={() => setActiveTab('recorrentes')}>
-          <Text style={[styles.tabText, activeTab === 'recorrentes' && styles.activeTabText]}>
-            ♻️ Recorrentes
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Conteúdo Principal com Scroll */}
       <ScrollView
         style={styles.mainContent}
@@ -131,7 +97,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.cardContainer}>
-          {renderTabContent()}
+          <CardTarefas navigation={navigation} refreshKey={workspaceRefreshKey} />
         </View>
         {/* Espaçamento inferior */}
         <View style={styles.bottomSpacing} />

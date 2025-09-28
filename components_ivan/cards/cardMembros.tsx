@@ -10,7 +10,7 @@ import {
   Modal 
 } from 'react-native';
 import WorkspaceInterface from '../workspace/workspaceInterface';
-import { getActiveWorkspaceName, getUserWorkspaces, apiCall } from '../../services/authService';
+import { getActiveWorkspaceId, getUserWorkspaces, apiCall } from '../../services/authService';
 
 
 // Não recebe mais props de membros, criador, isEquipe
@@ -36,8 +36,8 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados}) => {
     try {
       const userWorkspaces = await getUserWorkspaces();
       setWorkspaces(userWorkspaces || []);
-      const activeWorkspaceName = await getActiveWorkspaceName();
-      const workspaceAtivo = userWorkspaces.find((ws: WorkspaceInterface) => ws.nome === activeWorkspaceName) || userWorkspaces[0];
+      const activeWorkspaceId = await getActiveWorkspaceId();
+      const workspaceAtivo = userWorkspaces.find((ws: WorkspaceInterface) => ws.id_workspace === activeWorkspaceId) || userWorkspaces[0];
       setActiveWorkspaceState(workspaceAtivo);
       setIdWorkspace(workspaceAtivo?.id_workspace || null);
       setIsEquipe(workspaceAtivo?.equipe || false);

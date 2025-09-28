@@ -12,7 +12,7 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
 import {
-  getActiveWorkspaceName,
+  getActiveWorkspaceId,
   getUserWorkspaces,
   setActiveWorkspace,
   getUserEmail,
@@ -39,37 +39,35 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState('');
   const [activeWorkspace, setActiveWorkspaceState] = useState<WorkspaceInterface | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
 
   useEffect(() => {
     initializeWorkspaceData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const initializeWorkspaceData = async () => {
     try {
       setLoading(true);
-      const [email, workspaces] = await Promise.all([
+      const [email, workspaces, wsId] = await Promise.all([
         getUserEmail(),
-        getUserWorkspaces()
+        getUserWorkspaces(),
+        getActiveWorkspaceId()
       ]);
-      
       setUserEmail(email || '');
       setUserWorkspaces(workspaces || []);
-      
+      setActiveWorkspaceId(wsId);
       if (workspaces && workspaces.length > 0) {
-        const activeWorkspaceName = await getActiveWorkspaceName();
-        const workspaceAtivo = workspaces.find((ws: WorkspaceInterface) => ws.nome === activeWorkspaceName) || workspaces[0];
-        
+        // Busca workspace ativo pelo id
+        const workspaceAtivo = workspaces.find((ws: WorkspaceInterface) => ws.id_workspace === wsId) || workspaces[0];
         setActiveWorkspaceState(workspaceAtivo);
         setWorkspaceName(workspaceAtivo.nome);
-        
+        setActiveWorkspaceId(workspaceAtivo.id_workspace);
         // Notificar o HomeScreen sobre o workspace ativo
         if (onWorkspaceChange) {
           onWorkspaceChange(workspaceAtivo);
         }
-        
         // Garantir que o workspace ativo está salvo
-        if (!activeWorkspaceName) {
+        if (!wsId) {
           await setActiveWorkspace(workspaceAtivo.id_workspace || 0, workspaceAtivo.nome);
         }
       }
@@ -86,13 +84,12 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
       await setActiveWorkspace(workspace.id_workspace || 0, workspace.nome);
       setWorkspaceName(workspace.nome);
       setActiveWorkspaceState(workspace);
+      setActiveWorkspaceId(workspace.id_workspace || null);
       setShowWorkspaceModal(false);
-      
       // Notificar o HomeScreen sobre a mudança
       if (onWorkspaceChange) {
         onWorkspaceChange(workspace);
       }
-      
       Alert.alert('Sucesso', `Workspace alterado para: ${workspace.nome}`);
     } catch (error) {
       console.error('Erro ao mudar workspace:', error);
@@ -191,7 +188,7 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
                           {item.equipe ? 'Equipe' : 'Pessoal'} • {item.emails?.length || 0} membros
                         </Text>
                       </View>
-                      {workspaceName === item.nome && (
+                      {activeWorkspaceId === item.id_workspace && (
                         <Text style={styles.workspaceSelected}>✓</Text>
                       )}
                     </TouchableOpacity>

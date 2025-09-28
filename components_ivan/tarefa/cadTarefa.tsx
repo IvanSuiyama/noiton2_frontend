@@ -56,7 +56,6 @@ const CadTarefa: React.FC = () => {
     recorrencia: undefined,
     id_workspace: 1, // Será atualizado ao montar
     id_usuario: 1, // Será atualizado ao montar
-    responsaveis: [], // Será preenchido ao montar
     categorias_selecionadas: [],
   });
   const [loading, setLoading] = useState<boolean>(false);
@@ -100,14 +99,10 @@ const CadTarefa: React.FC = () => {
   useEffect(() => {
     const inicializar = async () => {
       try {
-        const [userId, userEmail] = await Promise.all([
-          getUserId(),
-          getUserEmail(),
-        ]);
+        const userId = await getUserId();
         setFormData(prev => ({
           ...prev,
           id_usuario: userId || 1,
-          responsaveis: userEmail ? [userEmail] : [],
         }));
       } catch (error) {
         // fallback
@@ -170,11 +165,6 @@ const CadTarefa: React.FC = () => {
         getUserEmail(),
       ]);
 
-      // Se não houver responsáveis, usar o usuário logado
-      const responsaveis = formData.responsaveis && formData.responsaveis.length > 0
-        ? formData.responsaveis
-        : userEmail ? [userEmail] : [];
-
       const dadosEnvio = {
         titulo: formData.titulo,
         descricao: formData.descricao,
@@ -185,7 +175,6 @@ const CadTarefa: React.FC = () => {
         recorrencia: formData.recorrente ? formData.recorrencia : null,
         id_workspace: formData.id_workspace,
         id_usuario: userId || formData.id_usuario,
-        responsaveis,
       };
 
       // Criar a tarefa primeiro
@@ -215,7 +204,6 @@ const CadTarefa: React.FC = () => {
               recorrencia: undefined,
               id_workspace: workspaceAtual,
               id_usuario: userId || 1,
-              responsaveis: userEmail ? [userEmail] : [],
               categorias_selecionadas: [],
             });
             setErrors({});
@@ -605,7 +593,7 @@ const CadTarefa: React.FC = () => {
                       <View
                         style={[
                           styles.categoriaColor,
-                          {backgroundColor: item.cor},
+                          {backgroundColor: '#888'},
                         ]}
                       />
                       <Text

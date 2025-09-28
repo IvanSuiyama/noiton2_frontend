@@ -238,17 +238,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         )}
 
-        {/* Responsáveis */}
-        {tarefa.responsaveis && tarefa.responsaveis.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>👥 Responsáveis</Text>
-            {tarefa.responsaveis.map((email, index) => (
-              <View key={index} style={styles.responsavelItem}>
-                <Text style={styles.responsavelText}>• {email}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {/* Responsáveis removido (não existe mais no modelo) */}
 
         {/* Categorias */}
         {tarefa.categorias && tarefa.categorias.length > 0 && (
@@ -258,7 +248,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
               {tarefa.categorias.map((categoria, index) => (
                 <View key={index} style={[
                   styles.categoriaChip,
-                  { backgroundColor: categoria.cor || '#6c757d' }
+                  { backgroundColor: '#6c757d' }
                 ]}>
                   <Text style={styles.categoriaText}>{categoria.nome}</Text>
                 </View>

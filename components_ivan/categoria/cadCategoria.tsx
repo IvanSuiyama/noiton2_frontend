@@ -23,7 +23,6 @@ const CadCategoria: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [formData, setFormData] = useState<FormData>({
     nome: '',
-    cor: '',
     id_workspace: 1,
   });
   const [loading, setLoading] = useState<boolean>(false);
@@ -75,13 +74,12 @@ const CadCategoria: React.FC = () => {
     const coresPredefinidas = [
       '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43', '#10ac84', '#ee5a24'
     ];
-    const corAleatoria = coresPredefinidas[Math.floor(Math.random() * coresPredefinidas.length)];
+    const corAleatoria = ''; // Cor removida
 
     setLoading(true);
     try {
       await apiCall('/categorias', 'POST', {
         nome: formData.nome,
-        cor: corAleatoria,
         id_workspace: formData.id_workspace,
       });
 
@@ -92,7 +90,6 @@ const CadCategoria: React.FC = () => {
             // Limpar formulário
             setFormData(prev => ({
               nome: '',
-              cor: '',
               id_workspace: prev.id_workspace,
             }));
             setErrors({});

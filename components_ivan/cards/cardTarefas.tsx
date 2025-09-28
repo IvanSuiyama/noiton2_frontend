@@ -40,7 +40,9 @@ interface Filtros {
   status?: string;
   prioridade?: string;
   categoria_nome?: string;
-  responsavel_email?: string;
+  minhas_tarefas?: boolean;
+  recorrentes?: boolean;
+  tipo_recorrencia?: 'diaria' | 'semanal' | 'mensal';
 }
 
 const PRIORIDADE_CORES = {
@@ -75,19 +77,20 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   const [userEmail, setUserEmail] = useState<string>('');
   const [workspaceInfo, setWorkspaceInfo] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [minhasTarefas, setMinhasTarefas] = useState<boolean>(false);
+  const [recorrentes, setRecorrentes] = useState<boolean>(false);
+  const [tipoRecorrencia, setTipoRecorrencia] = useState<'diaria' | 'semanal' | 'mensal' | undefined>(undefined);
 
 
   // Sempre que refreshKey mudar, ou workspaceId/workspaceInfo/userEmail, recarrega tudo
   useEffect(() => {
     initializeWorkspace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
   useEffect(() => {
     if (workspaceId && workspaceInfo && userEmail) {
       carregarTarefas();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, workspaceInfo, userEmail, refreshKey]);
 
   const initializeWorkspace = async () => {
@@ -117,68 +120,16 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
   // Função para verificar se o usuário logado é o criador da tarefa
   const isCreator = (tarefa: Tarefa): boolean => {
-    if (!userEmail || !workspaceInfo) {
+    if (!currentUserId) {
       return false;
     }
-    
-    // VERIFICAÇÃO DIRETA: Se temos o ID do usuário atual, comparar com id_usuario da tarefa
-    if (currentUserId && tarefa.id_usuario === currentUserId) {
-      return true; // É o criador direto da tarefa
-    }
-    
-    // VERIFICAÇÃO ALTERNATIVA baseada nas regras de negócio:
-    
-    // 1. Se é o criador do workspace, pode editar todas as tarefas do workspace
-    if (workspaceInfo.criador === userEmail) {
-      return true;
-    }
-    
-    // 2. Se é workspace de equipe E o usuário está nos responsáveis, pode editar
-    if (workspaceInfo.equipe === true && tarefa.responsaveis.includes(userEmail)) {
-      return true;
-    }
-    
-    // 3. Para workspace pessoal, só pode editar se não há outros responsáveis 
-    // (assumindo que é o criador da tarefa)
-    if (workspaceInfo.equipe !== true) {
-      // Se só tem o próprio usuário como responsável ou não há responsáveis específicos
-      if (tarefa.responsaveis.length === 0 || 
-          (tarefa.responsaveis.length === 1 && tarefa.responsaveis.includes(userEmail))) {
-        return true;
-      }
-    }
-    
-    return false;
+    return tarefa.id_usuario === currentUserId;
   };
 
   // Função para validar se o usuário tem permissão de ver a tarefa
   const podeVerTarefa = (tarefa: Tarefa): boolean => {
-    if (!userEmail || !workspaceInfo) {
-      return false;
-    }
-
-    // 1. Se é um workspace de equipe, todas as tarefas são visíveis para membros da equipe
-    if (workspaceInfo.equipe === true) {
-      return true;
-    }
-
-    // 2. Se o usuário é o criador do workspace (pode ver todas as tarefas)
-    if (workspaceInfo.criador === userEmail) {
-      return true;
-    }
-
-    // 3. Se o email do usuário está na lista de responsáveis
-    if (tarefa.responsaveis && tarefa.responsaveis.includes(userEmail)) {
-      return true;
-    }
-
-    // 4. Se é o criador da tarefa
-    if (isCreator(tarefa)) {
-      return true;
-    }
-
-    // 5. Para workspace pessoal, só pode ver tarefas que criou ou é responsável
-    return false;
+    // Agora, todas as tarefas do workspace são visíveis para membros do workspace
+    return tarefa.id_workspace === workspaceId;
   };
 
   const carregarTarefas = async (filtrosCustom?: Filtros) => {
@@ -188,22 +139,23 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
     setLoading(true);
     try {
-      let endpoint = `/tarefas/workspace/${workspaceId}`;
       let dadosTarefas: Tarefa[] = [];
-
-      // Se há filtros, usar o endpoint de filtros
-      if (filtrosCustom && Object.keys(filtrosCustom).length > 0) {
-        const params = new URLSearchParams();
-        Object.entries(filtrosCustom).forEach(([key, value]) => {
-          if (value) {
-            params.append(key, value);
-          }
-        });
-        
-        endpoint = `/tarefas/workspace/${workspaceId}/filtros?${params.toString()}`;
+      // Se filtro "minhas tarefas" está ativo, buscar pela rota específica
+      if ((filtrosCustom?.minhas_tarefas || minhasTarefas) && currentUserId) {
+        const endpoint = `/tarefas/workspace/${workspaceId}/usuario/${currentUserId}`;
         dadosTarefas = await apiCall(endpoint, 'GET');
       } else {
-        // Buscar todas as tarefas do workspace
+        let endpoint = `/tarefas/workspace/${workspaceId}`;
+        // Se há outros filtros, usar endpoint de filtros
+        if (filtrosCustom && Object.keys(filtrosCustom).length > 0) {
+          const params = new URLSearchParams();
+          Object.entries(filtrosCustom).forEach(([key, value]) => {
+            if (value && key !== 'minhas_tarefas') {
+              params.append(key, value);
+            }
+          });
+          endpoint = `/tarefas/workspace/${workspaceId}/filtros?${params.toString()}`;
+        }
         dadosTarefas = await apiCall(endpoint, 'GET');
       }
 
@@ -214,18 +166,28 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
           if (tarefa.id_workspace !== workspaceId) {
             return false;
           }
-          // 1. Não pode ser recorrente
-          if (tarefa.recorrente) {
+          // 1. Se filtro recorrentes está ativo, só mostra recorrentes
+          if ((filtrosCustom?.recorrentes || recorrentes) && !tarefa.recorrente) {
             return false;
           }
-          // 2. Mostrar todas as tarefas não recorrentes do workspace ativo, inclusive concluídas, se não houver filtro
-          // 3. Se há filtro de status "concluido", mostrar apenas concluídas
+          // 2. Se filtro recorrentes NÃO está ativo, só mostra não recorrentes
+          if (!(filtrosCustom?.recorrentes || recorrentes) && tarefa.recorrente) {
+            return false;
+          }
+          // 3. Se filtro de tipo de recorrência está ativo, filtra pelo tipo
+          if ((filtrosCustom?.recorrentes || recorrentes) && (filtrosCustom?.tipo_recorrencia || tipoRecorrencia)) {
+            const tipo = filtrosCustom?.tipo_recorrencia || tipoRecorrencia;
+            if (tarefa.recorrencia !== tipo) {
+              return false;
+            }
+          }
+          // 4. Se há filtro de status "concluido", mostrar apenas concluídas
           if (filtrosCustom?.status === 'concluido') {
             if (!tarefa.concluida) {
               return false;
             }
           }
-          // 4. Validar permissões do usuário
+          // 5. Validar permissões do usuário
           return podeVerTarefa(tarefa);
         })
         .sort((a, b) => {
@@ -261,12 +223,18 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
   const aplicarFiltros = async (novosFiltros: Filtros) => {
     setFiltros(novosFiltros);
+    setMinhasTarefas(!!novosFiltros.minhas_tarefas);
+    setRecorrentes(!!novosFiltros.recorrentes);
+    setTipoRecorrencia(novosFiltros.tipo_recorrencia);
     await carregarTarefas(novosFiltros);
     setShowFiltroModal(false);
   };
 
   const limparFiltros = async () => {
     setFiltros({});
+    setMinhasTarefas(false);
+    setRecorrentes(false);
+    setTipoRecorrencia(undefined);
     setPalavraChave('');
     await carregarTarefas();
     setShowFiltroModal(false);
@@ -412,6 +380,65 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         </View>
       </View>
 
+      {/* Filtro recorrentes destacado */}
+      <View style={styles.filtroRecorrentesBar}>
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 0 }}
+          onPress={() => {
+            setRecorrentes(!recorrentes);
+            setFiltros(prev => ({ ...prev, recorrentes: !recorrentes, tipo_recorrencia: undefined }));
+            setTipoRecorrencia(undefined);
+          }}
+        >
+          <View style={{
+            width: 22,
+            height: 22,
+            borderRadius: 6,
+            borderWidth: 2,
+            borderColor: '#28a745',
+            backgroundColor: recorrentes ? '#28a745' : 'transparent',
+            marginRight: 10,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            {recorrentes && (
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
+            )}
+          </View>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+            Mostrar apenas tarefas recorrentes
+          </Text>
+        </TouchableOpacity>
+        {/* Select tipo de recorrência */}
+        {recorrentes && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+            <Text style={{ color: '#fff', fontSize: 15, marginRight: 10 }}>Tipo:</Text>
+            {['diaria', 'semanal', 'mensal'].map(tipo => (
+              <TouchableOpacity
+                key={tipo}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: tipoRecorrencia === tipo ? '#28a745' : '#404040',
+                  backgroundColor: tipoRecorrencia === tipo ? '#28a745' : 'transparent',
+                  marginRight: 8,
+                }}
+                onPress={() => {
+                  setTipoRecorrencia(tipoRecorrencia === tipo ? undefined : tipo as any);
+                  setFiltros(prev => ({ ...prev, tipo_recorrencia: prev.tipo_recorrencia === tipo ? undefined : tipo as any }));
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: tipoRecorrencia === tipo ? 'bold' : 'normal' }}>
+                  {tipo === 'diaria' ? 'Dia' : tipo === 'semanal' ? 'Semana' : 'Mês'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
       {/* Lista de tarefas */}
       <View style={styles.tarefasContainer}>
         {loading ? (
@@ -505,6 +532,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                 </View>
               </View>
 
+
               {/* Filtro por Nome da Categoria */}
               <View style={styles.filtroSection}>
                 <Text style={styles.filtroLabel}>Categoria (nome):</Text>
@@ -519,19 +547,87 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                 />
               </View>
 
-              {/* Filtro por Responsável */}
+              {/* Filtro Minhas Tarefas */}
               <View style={styles.filtroSection}>
-                <Text style={styles.filtroLabel}>Responsável (email):</Text>
-                <TextInput
-                  style={styles.filtroInput}
-                  placeholder="Digite o email do responsável..."
-                  placeholderTextColor="#6c757d"
-                  value={filtros.responsavel_email || ''}
-                  onChangeText={(text) =>
-                    setFiltros(prev => ({ ...prev, responsavel_email: text }))
-                  }
-                />
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}
+                  onPress={() => setFiltros(prev => ({ ...prev, minhas_tarefas: !prev.minhas_tarefas }))}
+                >
+                  <View style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    borderWidth: 2,
+                    borderColor: '#007bff',
+                    backgroundColor: filtros.minhas_tarefas ? '#007bff' : 'transparent',
+                    marginRight: 10,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    {filtros.minhas_tarefas && (
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
+                    )}
+                  </View>
+                  <Text style={{ color: '#fff', fontSize: 16 }}>
+                    Mostrar apenas minhas tarefas
+                  </Text>
+                </TouchableOpacity>
               </View>
+
+              {/* Filtro Tarefas Recorrentes */}
+              <View style={styles.filtroSection}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}
+                  onPress={() => setFiltros(prev => ({ ...prev, recorrentes: !prev.recorrentes }))}
+                >
+                  <View style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    borderWidth: 2,
+                    borderColor: '#28a745',
+                    backgroundColor: filtros.recorrentes ? '#28a745' : 'transparent',
+                    marginRight: 10,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    {filtros.recorrentes && (
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
+                    )}
+                  </View>
+                  <Text style={{ color: '#fff', fontSize: 16 }}>
+                    Mostrar apenas tarefas recorrentes
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Select tipo de recorrência */}
+                {filtros.recorrentes && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                    <Text style={{ color: '#fff', fontSize: 15, marginRight: 10 }}>Tipo:</Text>
+                    {['diaria', 'semanal', 'mensal'].map(tipo => (
+                      <TouchableOpacity
+                        key={tipo}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: filtros.tipo_recorrencia === tipo ? '#28a745' : '#404040',
+                          backgroundColor: filtros.tipo_recorrencia === tipo ? '#28a745' : 'transparent',
+                          marginRight: 8,
+                        }}
+                        onPress={() => setFiltros(prev => ({ ...prev, tipo_recorrencia: prev.tipo_recorrencia === tipo ? undefined : tipo as any }))}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: filtros.tipo_recorrencia === tipo ? 'bold' : 'normal' }}>
+                          {tipo === 'diaria' ? 'Dia' : tipo === 'semanal' ? 'Semana' : 'Mês'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+
             </ScrollView>
 
             <View style={styles.modalActions}>
@@ -604,6 +700,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   
+  filtroRecorrentesBar: {
+    flexDirection: 'column',
+    backgroundColor: '#232e23',
+    borderBottomWidth: 1,
+    borderBottomColor: '#28a745',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    alignItems: 'flex-start',
+    gap: 4,
+  },
   tarefasContainer: {
     flex: 1,
   },
