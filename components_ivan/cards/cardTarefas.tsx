@@ -104,15 +104,8 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       setUserEmail(email || '');
       setCurrentUserId(userId);
 
-      // Buscar informações do workspace pelo nome (rota correta)
-      if (name) {
-        try {
-          const workspaceData = await apiCall(`/workspaces/nome/${encodeURIComponent(name)}`, 'GET');
-          setWorkspaceInfo(workspaceData);
-        } catch (error) {
-          console.error('Erro ao obter informações do workspace:', error);
-        }
-      }
+      // Buscar informações do workspace: agora só por id ou email de usuário
+      // Se necessário, implemente aqui a busca por id ou remova se não for mais usada
     } catch (error) {
       console.error('Erro ao obter workspace ativo:', error);
     }

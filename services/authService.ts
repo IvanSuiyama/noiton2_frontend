@@ -293,7 +293,7 @@ export const hasUserWorkspaces = async (): Promise<boolean> => {
     const workspaces = await getUserWorkspaces();
     return workspaces && workspaces.length > 0;
   } catch (error) {
-    console.error('Erro ao verificar workspaces:', error);
+    console.error('Erro ao verificar workspace:', error);
     return false;
   }
 };
@@ -302,18 +302,15 @@ export const hasUserWorkspaces = async (): Promise<boolean> => {
 export const setupActiveWorkspace = async (): Promise<{hasWorkspace: boolean, workspace?: any}> => {
   try {
     const workspaces = await getUserWorkspaces();
-    
     if (workspaces && workspaces.length > 0) {
-      // Se tem workspaces, define o primeiro como ativo
+      // Se tem workspace(s), define o primeiro como ativo
       const firstWorkspace = workspaces[0];
       await setActiveWorkspace(firstWorkspace.id_workspace, firstWorkspace.nome);
-      
       return {
         hasWorkspace: true,
         workspace: firstWorkspace
       };
     }
-    
     return {hasWorkspace: false};
   } catch (error) {
     console.error('Erro ao configurar workspace ativo:', error);

@@ -35,7 +35,16 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados}) => {
   const initializeWorkspaceData = async () => {
     try {
       const userWorkspaces = await getUserWorkspaces();
-      setWorkspaces(userWorkspaces || []);
+      if (!Array.isArray(userWorkspaces) || userWorkspaces.length === 0) {
+        setWorkspaces([]);
+        setActiveWorkspaceState(null);
+        setIdWorkspace(null);
+        setIsEquipe(false);
+        setListaMembros([]);
+        setCriador('');
+        return;
+      }
+      setWorkspaces(userWorkspaces);
       const activeWorkspaceId = await getActiveWorkspaceId();
       const workspaceAtivo = userWorkspaces.find((ws: WorkspaceInterface) => ws.id_workspace === activeWorkspaceId) || userWorkspaces[0];
       setActiveWorkspaceState(workspaceAtivo);
@@ -50,6 +59,8 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados}) => {
       setIsEquipe(false);
       setListaMembros([]);
       setCriador('');
+      console.error('Erro ao buscar workspaces do usuário:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os workspaces. Tente novamente mais tarde.');
     }
   };
   useEffect(() => {
