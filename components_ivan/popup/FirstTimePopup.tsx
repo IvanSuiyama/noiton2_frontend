@@ -80,13 +80,13 @@ const FirstTimePopup: React.FC<Props> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   popup: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#232323',
     borderRadius: 16,
     padding: 32,
     width: Math.min(width - 40, 400),
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 16,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: '#333',
   },
   iconContainer: {
     alignItems: 'center',
@@ -112,13 +112,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#fff',
     textAlign: 'center',
     marginBottom: 16,
   },
   message: {
     fontSize: 16,
-    color: '#6c757d',
+    color: '#b0b0b0',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
@@ -139,14 +139,14 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 16,
-    color: '#495057',
+    color: '#e0e0e0',
     flex: 1,
   },
   buttonsContainer: {
     gap: 12,
   },
   createButton: {
-    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente
+    backgroundColor: 'rgba(108, 117, 125, 0.8)',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   createButtonText: {
-    color: '#ffffff',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   }

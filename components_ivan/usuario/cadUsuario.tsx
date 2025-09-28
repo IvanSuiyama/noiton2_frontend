@@ -208,7 +208,7 @@ const CadUsuario: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1a1a1a',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#232323',
     borderRadius: 12,
     padding: 24,
     shadowColor: '#000',
@@ -224,18 +224,18 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.10,
     shadowRadius: 8,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: '#333',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 32,
-    color: '#1a1a1a',
+    color: '#fff',
   },
   inputContainer: {
     marginBottom: 20,
@@ -244,16 +244,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#495057',
+    color: '#e0e0e0',
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#dee2e6',
+    borderColor: '#444',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    backgroundColor: '#ffffff',
-    color: '#495057',
+    backgroundColor: '#181818',
+    color: '#fff',
   },
   inputError: {
     borderColor: '#dc3545',
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   button: {
-    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente
+    backgroundColor: 'rgba(108, 117, 125, 0.8)',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
@@ -282,13 +282,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(108, 117, 125, 0.4)',
   },
   buttonText: {
-    color: '#ffffff',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
   requiredText: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#b0b0b0',
     textAlign: 'center',
     marginTop: 16,
   },

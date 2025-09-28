@@ -72,7 +72,7 @@ const WelcomeScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1a1a1a',
   },
   content: {
     flex: 1,
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente
+    backgroundColor: 'rgba(108, 117, 125, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#fff',
   },
   welcomeContainer: {
     alignItems: 'center',
@@ -110,20 +110,20 @@ const styles = StyleSheet.create({
   },
   welcomeTitle: {
     fontSize: 24,
-    color: '#6c757d',
+    color: '#b0b0b0',
     marginBottom: 8,
     textAlign: 'center',
   },
   appName: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#fff',
     marginBottom: 16,
     letterSpacing: -1,
   },
   welcomeSubtitle: {
     fontSize: 16,
-    color: '#6c757d',
+    color: '#b0b0b0',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   loginButton: {
-    backgroundColor: 'rgba(108, 117, 125, 0.8)', // Cinza transparente
+    backgroundColor: 'rgba(108, 117, 125, 0.8)',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   loginButtonText: {
-    color: '#ffffff',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signupButtonText: {
-    color: '#495057',
+    color: '#b0b0b0',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#b0b0b0',
     textAlign: 'center',
     lineHeight: 20,
   },
