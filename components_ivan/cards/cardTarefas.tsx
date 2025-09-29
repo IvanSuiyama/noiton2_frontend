@@ -87,11 +87,14 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     initializeWorkspace();
   }, [refreshKey]);
 
+  // Só carrega tarefas quando workspaceId mudar
   useEffect(() => {
-    if (workspaceId && workspaceInfo && userEmail) {
+    if (workspaceId) {
       carregarTarefas();
+    } else {
+      setTarefas([]);
     }
-  }, [workspaceId, workspaceInfo, userEmail, refreshKey]);
+  }, [workspaceId]);
 
   const initializeWorkspace = async () => {
     try {
@@ -104,8 +107,19 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       setUserEmail(email || '');
       setCurrentUserId(userId);
 
-      // Buscar informações do workspace: agora só por id ou email de usuário
-      // Se necessário, implemente aqui a busca por id ou remova se não for mais usada
+      // Buscar informações do workspace por id
+      if (id) {
+        try {
+          // Usar a rota correta: /workspaces/id/:id_workspace
+          const workspaceData = await apiCall(`/workspaces/id/${id}`, 'GET');
+          setWorkspaceInfo(workspaceData);
+        } catch (err) {
+          console.error('Erro ao buscar informações do workspace:', err);
+          setWorkspaceInfo(null);
+        }
+        // Buscar tarefas do workspace imediatamente após obter o id
+        await carregarTarefas();
+      }
     } catch (error) {
       console.error('Erro ao obter workspace ativo:', error);
     }
@@ -121,77 +135,28 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
   // Função para validar se o usuário tem permissão de ver a tarefa
   const podeVerTarefa = (tarefa: Tarefa): boolean => {
-    // Agora, todas as tarefas do workspace são visíveis para membros do workspace
-    return tarefa.id_workspace === workspaceId;
+    // Todas as tarefas retornadas pela API já são do workspace correto
+    return true;
   };
 
   const carregarTarefas = async (filtrosCustom?: Filtros) => {
     if (!workspaceId) {
+      setTarefas([]);
       return;
     }
-
     setLoading(true);
     try {
-      let dadosTarefas: Tarefa[] = [];
-      // Se filtro "minhas tarefas" está ativo, buscar pela rota específica
-      if ((filtrosCustom?.minhas_tarefas || minhasTarefas) && currentUserId) {
-        const endpoint = `/tarefas/workspace/${workspaceId}/usuario/${currentUserId}`;
-        dadosTarefas = await apiCall(endpoint, 'GET');
-      } else {
-        let endpoint = `/tarefas/workspace/${workspaceId}`;
-        // Se há outros filtros, usar endpoint de filtros
-        if (filtrosCustom && Object.keys(filtrosCustom).length > 0) {
-          const params = new URLSearchParams();
-          Object.entries(filtrosCustom).forEach(([key, value]) => {
-            if (value && key !== 'minhas_tarefas') {
-              params.append(key, value);
-            }
-          });
-          endpoint = `/tarefas/workspace/${workspaceId}/filtros?${params.toString()}`;
-        }
-        dadosTarefas = await apiCall(endpoint, 'GET');
-      }
-
-      // Aplicar todos os filtros de validação
-      const tarefasFiltradas = dadosTarefas
-        .filter(tarefa => {
-          // 0. Garante que a tarefa pertence ao workspace atual
-          if (tarefa.id_workspace !== workspaceId) {
-            return false;
-          }
-          // 1. Se filtro recorrentes está ativo, só mostra recorrentes
-          if ((filtrosCustom?.recorrentes || recorrentes) && !tarefa.recorrente) {
-            return false;
-          }
-          // 2. Se filtro recorrentes NÃO está ativo, só mostra não recorrentes
-          if (!(filtrosCustom?.recorrentes || recorrentes) && tarefa.recorrente) {
-            return false;
-          }
-          // 3. Se filtro de tipo de recorrência está ativo, filtra pelo tipo
-          if ((filtrosCustom?.recorrentes || recorrentes) && (filtrosCustom?.tipo_recorrencia || tipoRecorrencia)) {
-            const tipo = filtrosCustom?.tipo_recorrencia || tipoRecorrencia;
-            if (tarefa.recorrencia !== tipo) {
-              return false;
-            }
-          }
-          // 4. Se há filtro de status "concluido", mostrar apenas concluídas
-          if (filtrosCustom?.status === 'concluido') {
-            if (!tarefa.concluida) {
-              return false;
-            }
-          }
-          // 5. Validar permissões do usuário
-          return podeVerTarefa(tarefa);
-        })
+      const endpoint = `/tarefas/workspace/${workspaceId}`;
+      const dadosTarefas: Tarefa[] = await apiCall(endpoint, 'GET');
+      console.log('Tarefas recebidas da API:', dadosTarefas);
+      const tarefasOrdenadas = dadosTarefas
         .sort((a, b) => {
-          // Ordenar por data de criação (mais recentes primeiro)
           const dataA = new Date(a.data_criacao || 0).getTime();
           const dataB = new Date(b.data_criacao || 0).getTime();
           return dataB - dataA;
         })
-        .slice(0, 10); // Limitar a 10 tarefas
-
-      setTarefas(tarefasFiltradas);
+        .slice(0, 10);
+      setTarefas(tarefasOrdenadas);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
       Alert.alert('Erro', 'Não foi possível carregar as tarefas');
@@ -430,6 +395,14 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
             ))}
           </View>
         )}
+
+        {/* Botão Criar Tarefa */}
+        <TouchableOpacity
+          style={[styles.criarTarefaButton, { marginTop: 16, alignSelf: 'center' }]}
+          onPress={handleCriarTarefa}
+        >
+          <Text style={styles.criarTarefaButtonText}>➕ Criar Tarefa</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Lista de tarefas */}

@@ -16,11 +16,12 @@ import { getActiveWorkspaceId, getUserWorkspaces, apiCall } from '../../services
 // Não recebe mais props de membros, criador, isEquipe
 interface CardMembrosProps {
   onMembrosAtualizados?: (novosMembros: string[]) => void;
+  refreshKey?: any;
 }
 
 
 
-const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados}) => {
+const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refreshKey }) => {
   const [novoEmail, setNovoEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [listaMembros, setListaMembros] = useState<string[]>([]);
@@ -67,7 +68,17 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados}) => {
     initializeWorkspaceData();
   }, []);
 
+  // Atualiza membros sempre que o workspace ativo mudar
+  useEffect(() => {
+    if (idWorkspace) {
+      initializeWorkspaceData();
+    }
+  }, [idWorkspace]);
 
+  // Adiciona efeito para atualizar ao mudar refreshKey
+  useEffect(() => {
+    initializeWorkspaceData();
+  }, [refreshKey]);
 
   const validarEmail = async (email: string) => {
     try {

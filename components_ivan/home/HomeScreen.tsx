@@ -73,7 +73,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.topHeader}>
   <CardWorkspace navigation={navigation}  />
  <View style={{ marginRight: 90 }}>
-  <CardMembros />
+  <CardMembros refreshKey={workspaceRefreshKey} />
 </View>
   <CardUser navigation={navigation} />
       </View>
@@ -83,25 +83,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.dateText}>{currentDate}</Text>
       </View>
 
-      {/* Conteúdo Principal com Scroll */}
-      <ScrollView
-        style={styles.mainContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#ffffff']}
-            tintColor="#ffffff"
-          />
-        }
-        contentContainerStyle={styles.scrollContent}
-      >
+      {/* Conteúdo Principal sem ScrollView, rolagem fica no FlatList do CardTarefas */}
+      <View style={styles.mainContent}>
         <View style={styles.cardContainer}>
           <CardTarefas navigation={navigation} refreshKey={workspaceRefreshKey} />
         </View>
         {/* Espaçamento inferior */}
         <View style={styles.bottomSpacing} />
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };

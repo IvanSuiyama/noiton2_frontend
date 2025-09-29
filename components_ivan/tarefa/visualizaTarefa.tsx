@@ -91,18 +91,32 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       let tarefaData: TarefaCompleta;
 
       if (id_tarefa) {
-        // Se temos o ID, buscar diretamente todas as tarefas e filtrar
+        // Buscar tarefa pelo workspace (como antes)
         const todasTarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
         const tarefaEncontrada = todasTarefas.find((t: TarefaCompleta) => t.id_tarefa === id_tarefa);
-        
         if (!tarefaEncontrada) {
           throw new Error('Tarefa não encontrada');
         }
-        
         tarefaData = tarefaEncontrada;
+
+        // Buscar categorias da tarefa
+        try {
+          const categorias = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
+          tarefaData = { ...tarefaData, categorias };
+        } catch (catErr) {
+          tarefaData = { ...tarefaData, categorias: [] };
+        }
       } else if (titulo) {
-        // Se temos apenas o título, usar o endpoint específico
         tarefaData = await apiCall(`/tarefas/workspace/${workspaceId}/titulo/${encodeURIComponent(titulo)}`, 'GET');
+        // Buscar categorias da tarefa por id_tarefa do resultado
+        if (tarefaData && tarefaData.id_tarefa) {
+          try {
+            const categorias = await apiCall(`/tarefas/${tarefaData.id_tarefa}/categorias`, 'GET');
+            tarefaData = { ...tarefaData, categorias };
+          } catch (catErr) {
+            tarefaData = { ...tarefaData, categorias: [] };
+          }
+        }
       } else {
         throw new Error('ID da tarefa ou título é obrigatório');
       }
@@ -241,23 +255,25 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
         {/* Responsáveis removido (não existe mais no modelo) */}
 
         {/* Categorias */}
-        {tarefa.categorias && tarefa.categorias.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏷️ Categorias</Text>
-            <View style={styles.categoriasContainer}>
-              {tarefa.categorias.map((categoria, index) => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🏷️ Categorias</Text>
+          <View style={styles.categoriasContainer}>
+            {tarefa.categorias && tarefa.categorias.length > 0 ? (
+              tarefa.categorias.map((categoria, index) => (
                 <View key={index} style={[
                   styles.categoriaChip,
                   { backgroundColor: '#6c757d' }
                 ]}>
                   <Text style={styles.categoriaText}>{categoria.nome}</Text>
                 </View>
-              ))}
-            </View>
+              ))
+            ) : (
+              <Text style={{ color: '#aaa', fontStyle: 'italic' }}>Sem categorias</Text>
+            )}
           </View>
-        )}
+        </View>
 
-        {/* Informações Técnicas */}
+        {/* Informações Técnicas
         <View style={[styles.section, styles.lastSection]}>
           <Text style={styles.sectionTitle}>ℹ️ Informações</Text>
           <View style={styles.infoRow}>
@@ -281,7 +297,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
             <Text style={styles.infoLabel}>ID do Workspace:</Text>
             <Text style={styles.infoValue}>{tarefa.id_workspace}</Text>
           </View>
-        </View>
+        </View> */}
       </ScrollView>
     </View>
   );

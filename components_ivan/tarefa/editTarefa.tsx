@@ -110,8 +110,20 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
   const carregarDadosTarefa = async () => {
     setLoadingTarefa(true);
     try {
-      const tarefa = await apiCall(`/tarefas/${id_tarefa}`, 'GET');
-      
+      // Primeiro, buscar o id_workspace ativo se não estiver definido
+
+      let idWorkspace: number = formData.id_workspace;
+      if (!idWorkspace) {
+        // Se não estiver no formData, tente buscar do serviço
+        const ws = await getActiveWorkspaceId();
+        if (ws == null) {
+          throw new Error('Workspace não definido');
+        }
+        idWorkspace = ws;
+      }
+      // Buscar tarefa pela rota correta
+      const tarefa = await apiCall(`/tarefas/workspace/${idWorkspace}/tarefa/${id_tarefa}`, 'GET');
+
       // Buscar categorias associadas à tarefa
       let categoriasTarefa = [];
       try {
@@ -120,7 +132,7 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
       } catch (error) {
         console.log('Nenhuma categoria encontrada para a tarefa:', error);
       }
-      
+
       const tarefaFormatada: TarefaData = {
         id_tarefa: tarefa.id_tarefa,
         titulo: tarefa.titulo || '',
