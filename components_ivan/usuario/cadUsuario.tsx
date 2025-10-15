@@ -67,7 +67,7 @@ const CadUsuario: React.FC<Props> = ({navigation}) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://10.241.191.119:3000/usuarios', {
+      const response = await fetch('http://10.250.160.119:3000/usuarios', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

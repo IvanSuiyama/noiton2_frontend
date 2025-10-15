@@ -106,6 +106,16 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
         } catch (catErr) {
           tarefaData = { ...tarefaData, categorias: [] };
         }
+
+        // Verificar se não tem permissão para visualizar (caso implementado no backend)
+        if (tarefaData.nivel_acesso === undefined && tarefaData.pode_editar === false && tarefaData.pode_apagar === false) {
+          Alert.alert(
+            'Permissão negada', 
+            'Você não tem permissão para visualizar esta tarefa.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+          return;
+        }
       } else if (titulo) {
         tarefaData = await apiCall(`/tarefas/workspace/${workspaceId}/titulo/${encodeURIComponent(titulo)}`, 'GET');
         // Buscar categorias da tarefa por id_tarefa do resultado

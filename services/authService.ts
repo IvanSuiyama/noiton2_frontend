@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE = 'http://10.241.191.119:3000';
+const API_BASE = 'http://10.250.160.119:3000';
 const TOKEN_KEY = 'auth_token';
 const EMAIL_KEY = 'user_email';
 const USER_ID_KEY = 'user_id';
@@ -119,6 +119,12 @@ export const apiCall = async (
     throw new Error('Token expirado. Faça login novamente.');
   }
 
+  // SE NÃO TEM PERMISSÃO (403)
+  if (response.status === 403) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Você não tem permissão para realizar esta ação.');
+  }
+
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || 'Erro na requisição');
@@ -206,6 +212,11 @@ export const makeAuthenticatedRequest = async (
   if (response.status === 401) {
     await logout();
     throw new Error('Token expirado. Faça login novamente.');
+  }
+
+  if (response.status === 403) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Você não tem permissão para realizar esta ação.');
   }
 
   return response;
@@ -386,6 +397,68 @@ export const buscarComentariosPorAutor = async (email_autor: string) => {
     return response;
   } catch (error) {
     console.error('Erro ao buscar comentários por autor:', error);
+    throw error;
+  }
+};
+
+// =====================================================
+// 🔐 FUNÇÕES PARA GERENCIAR PERMISSÕES DE TAREFAS
+// =====================================================
+
+// Buscar workspace por ID específico
+export const buscarWorkspacePorId = async (id_workspace: number): Promise<any> => {
+  try {
+    const response = await apiCall(`/workspaces/id/${id_workspace}`, 'GET');
+    return response; // Agora retorna: { id_workspace, nome, equipe, criador, emails }
+  } catch (error) {
+    console.error('Erro ao buscar workspace por ID:', error);
+    throw error;
+  }
+};
+
+// Adicionar ou atualizar permissão em uma tarefa
+export const adicionarPermissaoTarefa = async (id_tarefa: number, id_usuario: number, nivel_acesso: number) => {
+  try {
+    const response = await apiCall(`/tarefas/${id_tarefa}/permissoes`, 'POST', {
+      id_usuario,
+      nivel_acesso
+    });
+    return response;
+  } catch (error) {
+    console.error('Erro ao adicionar permissão:', error);
+    throw error;
+  }
+};
+
+// Listar todas as permissões de uma tarefa
+export const listarPermissoesTarefa = async (id_tarefa: number) => {
+  try {
+    const response = await apiCall(`/tarefas/${id_tarefa}/permissoes`, 'GET');
+    return response;
+  } catch (error) {
+    console.error('Erro ao listar permissões da tarefa:', error);
+    throw error;
+  }
+};
+
+// Verificar minha permissão em uma tarefa específica
+export const verificarMinhaPermissao = async (id_tarefa: number) => {
+  try {
+    const response = await apiCall(`/tarefas/${id_tarefa}/minha-permissao`, 'GET');
+    return response;
+  } catch (error) {
+    console.error('Erro ao verificar permissão:', error);
+    throw error;
+  }
+};
+
+// Remover permissão de um usuário em uma tarefa
+export const removerPermissaoTarefa = async (id_tarefa: number, id_usuario: number) => {
+  try {
+    const response = await apiCall(`/tarefas/${id_tarefa}/permissoes/${id_usuario}`, 'DELETE');
+    return response;
+  } catch (error) {
+    console.error('Erro ao remover permissão:', error);
     throw error;
   }
 };

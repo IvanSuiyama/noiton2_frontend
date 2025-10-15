@@ -29,6 +29,8 @@ interface CardTarefasProps {
 
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
 import { getActiveWorkspaceName } from '../../services/authService';
+import GerenciarColaboradores from '../tarefa/gerenciarColaboradores';
+import WorkspaceInterface from '../workspace/workspaceInterface';
 
 // Usar a interface padrão do projeto
 interface Tarefa extends TarefaMultiplaInterface {
@@ -36,13 +38,18 @@ interface Tarefa extends TarefaMultiplaInterface {
 }
 
 interface Filtros {
-  palavras_chave?: string;
-  status?: string;
-  prioridade?: string;
-  categoria_nome?: string;
-  minhas_tarefas?: boolean;
-  recorrentes?: boolean;
-  tipo_recorrencia?: 'diaria' | 'semanal' | 'mensal';
+  // ✅ Filtros suportados pelo backend
+  palavras_chave?: string;    // Backend: busca em título e descrição
+  status?: string;            // Backend: status exato
+  prioridade?: string;        // Backend: prioridade exata
+  categoria_nome?: string;    // Backend: nome da categoria (ILIKE)
+  
+  // ✅ Filtros convertidos para backend
+  minhas_tarefas?: boolean;   // Frontend: converte para id_usuario no backend
+  
+  // ❌ Filtros NÃO suportados pelo backend (mantidos para futuro)
+  recorrentes?: boolean;      // TODO: Backend precisa implementar
+  tipo_recorrencia?: 'diaria' | 'semanal' | 'mensal'; // TODO: Backend precisa implementar
 }
 
 const PRIORIDADE_CORES = {
@@ -75,11 +82,13 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   const [workspaceName, setWorkspaceName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
-  const [workspaceInfo, setWorkspaceInfo] = useState<any>(null);
+  const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInterface | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [minhasTarefas, setMinhasTarefas] = useState<boolean>(false);
   const [recorrentes, setRecorrentes] = useState<boolean>(false);
   const [tipoRecorrencia, setTipoRecorrencia] = useState<'diaria' | 'semanal' | 'mensal' | undefined>(undefined);
+  const [showGerenciarColaboradores, setShowGerenciarColaboradores] = useState(false);
+  const [tarefaSelecionada, setTarefaSelecionada] = useState<Tarefa | null>(null);
 
 
   // Sempre que refreshKey mudar, ou workspaceId/workspaceInfo/userEmail, recarrega tudo
@@ -102,6 +111,14 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       const email = await getUserEmail();
       const userId = await getUserId();
       const name = await getActiveWorkspaceName();
+      
+      console.log('🔄 CardTarefas initializeWorkspace:', {
+        workspaceId: id,
+        workspaceName: name,
+        userEmail: email,
+        userId: userId,
+        refreshKey: refreshKey
+      });
       setWorkspaceId(id);
       setWorkspaceName(name || '');
       setUserEmail(email || '');
@@ -112,13 +129,23 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         try {
           // Usar a rota correta: /workspaces/id/:id_workspace
           const workspaceData = await apiCall(`/workspaces/id/${id}`, 'GET');
+          console.log('📋 Dados completos do workspace recebidos:', workspaceData);
           setWorkspaceInfo(workspaceData);
+          
+          // Validar se o workspace carregado é realmente o esperado
+          if (workspaceData.id_workspace !== id) {
+            console.error('⚠️ ERRO: ID do workspace não confere!', {
+              esperado: id,
+              recebido: workspaceData.id_workspace,
+              workspace: workspaceData
+            });
+          }
         } catch (err) {
           console.error('Erro ao buscar informações do workspace:', err);
           setWorkspaceInfo(null);
         }
-        // Buscar tarefas do workspace imediatamente após obter o id
-        await carregarTarefas();
+        // ❌ REMOVIDO: carregarTarefas() já é chamado pelo useEffect do workspaceId
+        // await carregarTarefas();
       }
     } catch (error) {
       console.error('Erro ao obter workspace ativo:', error);
@@ -130,13 +157,45 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     if (!currentUserId) {
       return false;
     }
-    return tarefa.id_usuario === currentUserId;
+    // Verifica pelo campo nivel_acesso (0 = criador) ou pelo id_usuario se não houver permissões definidas
+    return tarefa.nivel_acesso === 0 || (tarefa.nivel_acesso === undefined && tarefa.id_usuario === currentUserId);
   };
 
-  // Função para validar se o usuário tem permissão de ver a tarefa
-  const podeVerTarefa = (tarefa: Tarefa): boolean => {
-    // Todas as tarefas retornadas pela API já são do workspace correto
-    return true;
+  // Função para verificar se pode editar a tarefa
+  const podeEditarTarefa = (tarefa: Tarefa): boolean => {
+    // Se o campo pode_editar está definido, usar ele
+    if (tarefa.pode_editar !== undefined) {
+      return tarefa.pode_editar;
+    }
+    // Fallback: criador (nivel 0) ou editor (nivel 1) podem editar
+    return tarefa.nivel_acesso === 0 || tarefa.nivel_acesso === 1 || isCreator(tarefa);
+  };
+
+  // Função para verificar se pode apagar a tarefa
+  const podeApagarTarefa = (tarefa: Tarefa): boolean => {
+    // Se o campo pode_apagar está definido, usar ele
+    if (tarefa.pode_apagar !== undefined) {
+      return tarefa.pode_apagar;
+    }
+    // Fallback: apenas criador (nivel 0) pode apagar
+    return tarefa.nivel_acesso === 0 || isCreator(tarefa);
+  };
+
+  // Função para obter ícone de permissão
+  const getPermissaoIcon = (tarefa: Tarefa): string => {
+    // Não mostrar ícone de permissão para workspaces individuais
+    if (!workspaceInfo?.equipe) {
+      return '';
+    }
+    
+    if (tarefa.nivel_acesso === 0 || isCreator(tarefa)) {
+      return '👑'; // Criador
+    } else if (tarefa.nivel_acesso === 1) {
+      return '✏️'; // Editor
+    } else if (tarefa.nivel_acesso === 2) {
+      return '👁️'; // Visualizador
+    }
+    return '';
   };
 
   const carregarTarefas = async (filtrosCustom?: Filtros) => {
@@ -146,16 +205,126 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     }
     setLoading(true);
     try {
-      const endpoint = `/tarefas/workspace/${workspaceId}`;
+      // Usar endpoint correto baseado se há filtros ou não
+      const filtrosAtivos = filtrosCustom || filtros;
+      const temFiltros = Object.keys(filtrosAtivos).length > 0;
+      
+      let endpoint: string;
+      
+      if (temFiltros) {
+        // Usar endpoint de filtros do backend
+        endpoint = `/workspaces/${workspaceId}/tarefas/filtros`;
+        const queryParams = new URLSearchParams();
+        
+        // Filtro por palavra-chave (✅ existe no backend)
+        if (filtrosAtivos.palavras_chave?.trim()) {
+          queryParams.append('palavras_chave', filtrosAtivos.palavras_chave.trim());
+        }
+        
+        // Filtro por status (✅ existe no backend)
+        if (filtrosAtivos.status) {
+          queryParams.append('status', filtrosAtivos.status);
+        }
+        
+        // Filtro por prioridade (✅ existe no backend)
+        if (filtrosAtivos.prioridade) {
+          queryParams.append('prioridade', filtrosAtivos.prioridade);
+        }
+        
+        // Filtro por categoria (✅ existe no backend)
+        if (filtrosAtivos.categoria_nome?.trim()) {
+          queryParams.append('categoria_nome', filtrosAtivos.categoria_nome.trim());
+        }
+        
+        // Filtro minhas tarefas (❌ NÃO existe - usar id_usuario)
+        if (filtrosAtivos.minhas_tarefas && currentUserId) {
+          queryParams.append('id_usuario', currentUserId.toString());
+        }
+        
+        // ❌ REMOVIDO: Filtros recorrentes não existem no backend
+        // Backend não suporta: recorrentes, tipo_recorrencia
+        
+        if (queryParams.toString()) {
+          endpoint += `?${queryParams.toString()}`;
+        }
+      } else {
+        // Sem filtros - usar endpoint simples
+        endpoint = `/tarefas/workspace/${workspaceId}`;
+      }
+      
+      console.log('📡 Chamando endpoint para workspace', workspaceId, ':', endpoint);
       const dadosTarefas: Tarefa[] = await apiCall(endpoint, 'GET');
-      console.log('Tarefas recebidas da API:', dadosTarefas);
-      const tarefasOrdenadas = dadosTarefas
+      
+      // Tarefas carregadas com sucesso
+      
+      console.log('📄 Tarefas recebidas da API:', {
+        total: dadosTarefas.length,
+        workspaceId: workspaceId,
+        workspaceInfo: workspaceInfo?.nome || 'Carregando...',
+        tarefas: dadosTarefas.map(t => ({ 
+          id: t.id_tarefa, 
+          titulo: t.titulo, 
+          id_workspace: t.id_workspace 
+        }))
+      });
+      
+      // VALIDAÇÃO CRÍTICA: Verificar se todas as tarefas pertencem ao workspace correto
+      const tarefasInvalidas = dadosTarefas.filter(tarefa => tarefa.id_workspace !== workspaceId);
+      if (tarefasInvalidas.length > 0) {
+        console.error('🚨 ERRO CRÍTICO: Tarefas de workspace incorreto detectadas!', {
+          workspaceAtivo: workspaceId,
+          workspaceNome: workspaceInfo?.nome,
+          workspaceInfo: workspaceInfo,
+          totalTarefas: dadosTarefas.length,
+          tarefasInvalidas: tarefasInvalidas.map(t => ({ 
+            id: t.id_tarefa, 
+            workspace: t.id_workspace, 
+            titulo: t.titulo 
+          }))
+        });
+        Alert.alert(
+          'Erro de Sincronização', 
+          `Detectadas ${tarefasInvalidas.length} tarefa(s) de workspace incorreto!\n\nWorkspace ativo: ${workspaceId} (${workspaceInfo?.nome})\nTarefas inválidas: ${tarefasInvalidas.map(t => t.titulo).join(', ')}`,
+          [{ 
+            text: 'Recarregar', 
+            onPress: async () => {
+              setTarefas([]);
+              await initializeWorkspace();
+            }
+          }]
+        );
+        return;
+      }
+      
+      // ✅ Aplicar filtros locais para funcionalidades não suportadas pelo backend
+      let tarefasFiltradas = dadosTarefas;
+      
+      // ❌ Filtro recorrentes (não existe no backend - aplicar localmente)
+      if (filtrosAtivos.recorrentes) {
+        tarefasFiltradas = tarefasFiltradas.filter(tarefa => tarefa.recorrente === true);
+        
+        // ❌ Filtro tipo de recorrência (não existe no backend - aplicar localmente)
+        if (filtrosAtivos.tipo_recorrencia) {
+          tarefasFiltradas = tarefasFiltradas.filter(tarefa => 
+            tarefa.recorrencia === filtrosAtivos.tipo_recorrencia
+          );
+        }
+      }
+      
+      console.log('🔍 Filtros aplicados - Total tarefas:', tarefasFiltradas.length);
+      
+      const tarefasOrdenadas = tarefasFiltradas
         .sort((a, b) => {
           const dataA = new Date(a.data_criacao || 0).getTime();
           const dataB = new Date(b.data_criacao || 0).getTime();
           return dataB - dataA;
-        })
-        .slice(0, 10);
+        });
+        
+      console.log('✅ Definindo tarefas no estado:', { 
+        total: tarefasOrdenadas.length, 
+        workspaceId,
+        primeiras: tarefasOrdenadas.slice(0, 3).map(t => ({ id: t.id_tarefa, titulo: t.titulo }))
+      });
       setTarefas(tarefasOrdenadas);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
@@ -166,35 +335,39 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   };
 
   const pesquisarPorPalavraChave = async () => {
-    if (!palavraChave.trim()) {
-      carregarTarefas();
-      return;
-    }
-
     const filtrosPesquisa = {
       ...filtros,
-      palavras_chave: palavraChave.trim(),
+      ...(palavraChave.trim() && { palavras_chave: palavraChave.trim() })
     };
 
+    // Atualizar o estado dos filtros para incluir a palavra-chave
+    setFiltros(filtrosPesquisa);
     await carregarTarefas(filtrosPesquisa);
   };
 
   const aplicarFiltros = async (novosFiltros: Filtros) => {
-    setFiltros(novosFiltros);
+    // Incluir palavra-chave atual nos filtros se ela existir
+    const filtrosCompletos = {
+      ...novosFiltros,
+      ...(palavraChave.trim() && { palavras_chave: palavraChave.trim() })
+    };
+    
+    setFiltros(filtrosCompletos);
     setMinhasTarefas(!!novosFiltros.minhas_tarefas);
     setRecorrentes(!!novosFiltros.recorrentes);
     setTipoRecorrencia(novosFiltros.tipo_recorrencia);
-    await carregarTarefas(novosFiltros);
+    await carregarTarefas(filtrosCompletos);
     setShowFiltroModal(false);
   };
 
   const limparFiltros = async () => {
-    setFiltros({});
+    const filtrosVazios = {};
+    setFiltros(filtrosVazios);
     setMinhasTarefas(false);
     setRecorrentes(false);
     setTipoRecorrencia(undefined);
     setPalavraChave('');
-    await carregarTarefas();
+    await carregarTarefas(filtrosVazios);
     setShowFiltroModal(false);
   };
 
@@ -223,6 +396,11 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     Alert.alert('Em desenvolvimento', 'Funcionalidade de comentários será implementada em breve');
   };
 
+  const handleGerenciarColaboradores = (tarefa: Tarefa) => {
+    setTarefaSelecionada(tarefa);
+    setShowGerenciarColaboradores(true);
+  };
+
   const handleDelete = (tarefa: Tarefa) => {
     deletarTarefa({
       id_tarefa: tarefa.id_tarefa,
@@ -238,25 +416,54 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   };
 
   const renderTarefa = ({ item }: { item: Tarefa }) => {
-    const usuarioEhCriador = isCreator(item);
+    console.log('🎯 Renderizando tarefa:', { 
+      id: item.id_tarefa, 
+      titulo: item.titulo, 
+      nivel_acesso: item.nivel_acesso,
+      workspaceInfo: workspaceInfo?.equipe 
+    });
+    
+    const podeEditar = podeEditarTarefa(item);
+    const podeApagar = podeApagarTarefa(item);
+    const permissaoIcon = getPermissaoIcon(item);
     
     return (
       <View style={styles.tarefaItem}>
         <View style={styles.tarefaContent}>
           <View style={styles.tarefaInfo}>
-            <Text style={styles.tarefaTitulo} numberOfLines={1}>
-              {item.titulo}
-            </Text>
+            <View style={styles.tarefaTituloContainer}>
+              <Text style={styles.tarefaTitulo} numberOfLines={1}>
+                {item.titulo}
+              </Text>
+              {permissaoIcon && permissaoIcon.trim() !== '' && (
+                <Text style={styles.permissaoIcon}>{permissaoIcon}</Text>
+              )}
+            </View>
             {item.descricao && (
               <Text style={styles.tarefaDescricao} numberOfLines={2}>
                 {item.descricao}
               </Text>
             )}
+            {/* Mostrar informações de permissão para debug */}
+            {__DEV__ && (
+              <Text style={styles.debugInfo}>
+                Nível: {item.nivel_acesso} | Editar: {podeEditar ? 'Sim' : 'Não'} | Apagar: {podeApagar ? 'Sim' : 'Não'}
+              </Text>
+            )}
           </View>
           
           <View style={styles.tarefaActions}>
-            {/* Ícone de editar - apenas para o criador */}
-            {usuarioEhCriador && (
+            {/* Ícone de colaboradores - apenas para criadores E workspaces de equipe */}
+            {isCreator(item) && workspaceInfo?.equipe && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleGerenciarColaboradores(item)}>
+                <Text style={styles.actionIcon}>👥</Text>
+              </TouchableOpacity>
+            )}
+            
+            {/* Ícone de editar - para criadores e editores */}
+            {podeEditar && (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => handleEditarTarefa(item)}>
@@ -264,8 +471,8 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
               </TouchableOpacity>
             )}
             
-            {/* Ícone de deletar - apenas para o criador */}
-            {usuarioEhCriador && (
+            {/* Ícone de deletar - apenas para criadores */}
+            {podeApagar && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.deleteButton]}
                 onPress={() => handleDelete(item)}>
@@ -280,7 +487,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
               <Text style={styles.actionIcon}>👁️</Text>
             </TouchableOpacity>
             
-            {/* Ícone de comentário oculto por enquanto */}
+            {/* Ícone de comentário - futura implementação */}
             {false && (
               <TouchableOpacity
                 style={styles.actionButton}
@@ -342,10 +549,19 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       <View style={styles.filtroRecorrentesBar}>
         <TouchableOpacity
           style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 0 }}
-          onPress={() => {
-            setRecorrentes(!recorrentes);
-            setFiltros(prev => ({ ...prev, recorrentes: !recorrentes, tipo_recorrencia: undefined }));
+          onPress={async () => {
+            const novoRecorrente = !recorrentes;
+            setRecorrentes(novoRecorrente);
             setTipoRecorrencia(undefined);
+            
+            const novosFiltros = {
+              ...filtros,
+              recorrentes: novoRecorrente,
+              tipo_recorrencia: undefined
+            };
+            
+            setFiltros(novosFiltros);
+            await carregarTarefas(novosFiltros);
           }}
         >
           <View style={{
@@ -383,9 +599,17 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                   backgroundColor: tipoRecorrencia === tipo ? '#28a745' : 'transparent',
                   marginRight: 8,
                 }}
-                onPress={() => {
-                  setTipoRecorrencia(tipoRecorrencia === tipo ? undefined : tipo as any);
-                  setFiltros(prev => ({ ...prev, tipo_recorrencia: prev.tipo_recorrencia === tipo ? undefined : tipo as any }));
+                onPress={async () => {
+                  const novoTipo = tipoRecorrencia === tipo ? undefined : tipo as any;
+                  setTipoRecorrencia(novoTipo);
+                  
+                  const novosFiltros = {
+                    ...filtros,
+                    tipo_recorrencia: novoTipo
+                  };
+                  
+                  setFiltros(novosFiltros);
+                  await carregarTarefas(novosFiltros);
                 }}
               >
                 <Text style={{ color: '#fff', fontWeight: tipoRecorrencia === tipo ? 'bold' : 'normal' }}>
@@ -407,20 +631,34 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
       {/* Lista de tarefas */}
       <View style={styles.tarefasContainer}>
+        {(() => {
+          console.log('🔍 Estado de renderização:', { 
+            loading, 
+            tarefasLength: tarefas.length, 
+            workspaceId, 
+            workspaceInfo: workspaceInfo?.nome 
+          });
+          return null;
+        })()}
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Carregando tarefas...</Text>
           </View>
-        ) : tarefas.length === 0 ? (
-          renderEmptyState()
         ) : (
-          <FlatList
-            data={tarefas}
-            keyExtractor={(item) => item.id_tarefa.toString()}
-            renderItem={renderTarefa}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContainer}
-          />
+          <View>
+            <Text style={{color: '#fff', padding: 10}}>DEBUG: Tarefas encontradas: {tarefas.length}</Text>
+            {tarefas.length === 0 ? (
+              renderEmptyState()
+            ) : (
+              <FlatList
+                data={tarefas}
+                keyExtractor={(item) => item.id_tarefa.toString()}
+                renderItem={renderTarefa}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContainer}
+              />
+            )}
+          </View>
         )}
       </View>
 
@@ -611,6 +849,20 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Gerenciar Colaboradores */}
+      {tarefaSelecionada && (
+        <GerenciarColaboradores
+          visible={showGerenciarColaboradores}
+          onClose={() => {
+            setShowGerenciarColaboradores(false);
+            setTarefaSelecionada(null);
+          }}
+          tarefaId={tarefaSelecionada.id_tarefa}
+          tarefaTitulo={tarefaSelecionada.titulo}
+          workspaceEquipe={workspaceInfo?.equipe || false}
+        />
+      )}
     </View>
   );
 };
@@ -927,6 +1179,26 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // Novos estilos para permissões
+  tarefaTituloContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  
+  permissaoIcon: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  
+  debugInfo: {
+    color: '#6c757d',
+    fontSize: 10,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

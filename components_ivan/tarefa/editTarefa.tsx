@@ -123,6 +123,16 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
       }
       // Buscar tarefa pela rota correta
       const tarefa = await apiCall(`/tarefas/workspace/${idWorkspace}/tarefa/${id_tarefa}`, 'GET');
+      
+      // Verificar permissão para editar
+      if (tarefa && tarefa.pode_editar === false) {
+        Alert.alert(
+          'Permissão negada', 
+          'Você não tem permissão para editar esta tarefa.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
 
       // Buscar categorias associadas à tarefa
       let categoriasTarefa = [];
