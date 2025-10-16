@@ -9,8 +9,13 @@ import {
   FlatList, 
   Modal 
 } from 'react-native';
+import {
+  apiCall,
+  getActiveWorkspaceId,
+  getUserWorkspaces,
+} from '../../services/authService';
 import WorkspaceInterface from '../workspace/workspaceInterface';
-import { getActiveWorkspaceId, getUserWorkspaces, apiCall } from '../../services/authService';
+import { useTheme } from '../theme/ThemeContext';
 
 
 // Não recebe mais props de membros, criador, isEquipe
@@ -22,6 +27,7 @@ interface CardMembrosProps {
 
 
 const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refreshKey }) => {
+  const { theme } = useTheme();
   const [novoEmail, setNovoEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [listaMembros, setListaMembros] = useState<string[]>([]);
@@ -151,10 +157,10 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
   // Card pequeno (apenas ícone - igual ao CardUser)
   const renderCardPequeno = () => (
     <TouchableOpacity 
-      style={styles.cardPequeno} 
+      style={[styles.cardPequeno, { backgroundColor: theme.colors.surface }]} 
       onPress={() => setModalVisible(true)}
     >
-      <View style={styles.cardIcon}>
+      <View style={[styles.cardIcon, { backgroundColor: theme.colors.background }]}>
         <Text style={styles.cardIconText}>👥</Text>
       </View>
     </TouchableOpacity>
@@ -169,10 +175,10 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
       onRequestClose={() => setModalVisible(false)}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
           {/* Header do Modal */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Gerenciar Membros</Text>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Gerenciar Membros</Text>
             <TouchableOpacity 
               onPress={() => setModalVisible(false)}
               style={styles.modalCloseButton}

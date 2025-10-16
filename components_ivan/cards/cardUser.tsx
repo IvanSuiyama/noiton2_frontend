@@ -13,6 +13,8 @@ import {
   getUserEmail,
   apiCall,
 } from '../../services/authService';
+import ThemeToggle from '../theme/ThemeToggle';
+import { useTheme } from '../theme/ThemeContext';
 
 type CardUserNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -21,6 +23,7 @@ interface CardUserProps {
 }
 
 const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
+  const { theme } = useTheme();
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
@@ -79,13 +82,13 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
 
   return (
     <View>
-      <View style={styles.userCard}>
+      <View style={[styles.userCard, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.userInfo}>
-          <Text style={styles.userNameText}>{userFullName || userName}</Text>
-          <Text style={styles.userLabel}>Usuário</Text>
+          <Text style={[styles.userNameText, { color: theme.colors.text }]}>{userFullName || userName}</Text>
+          <Text style={[styles.userLabel, { color: theme.colors.textSecondary }]}>Usuário</Text>
         </View>
         <TouchableOpacity
-          style={styles.userIcon}
+          style={[styles.userIcon, { backgroundColor: theme.colors.background }]}
           onPress={() => setShowUserModal(true)}>
           <Text style={styles.userIconText}>👤</Text>
         </TouchableOpacity>
@@ -101,10 +104,10 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
           activeOpacity={1}
           onPress={() => setShowUserModal(false)}>
           
-          <View style={styles.userDropdown}>
-            <View style={styles.userDropdownHeader}>
-              <View style={styles.userAvatar}>
-                <Text style={styles.userAvatarText}>
+          <View style={[styles.userDropdown, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.userDropdownHeader, { borderBottomColor: theme.colors.border }]}>
+              <View style={[styles.userAvatar, { backgroundColor: theme.colors.background }]}>
+                <Text style={[styles.userAvatarText, { color: theme.colors.text }]}>
                   {(userFullName || userName).charAt(0).toUpperCase()}
                 </Text>
               </View>
@@ -127,6 +130,10 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
                 <Text style={styles.actionButtonIcon}>✏️</Text>
                 <Text style={styles.actionButtonText}>Editar Perfil</Text>
               </TouchableOpacity>
+
+              <View style={styles.themeToggleContainer}>
+                <ThemeToggle showLabel={false} showSwitch={false} />
+              </View>
 
               <TouchableOpacity 
                 style={styles.actionButton}
@@ -250,6 +257,12 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     gap: 8,
+  },
+  themeToggleContainer: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(108, 117, 125, 0.1)',
   },
   actionButton: {
     flexDirection: 'row',

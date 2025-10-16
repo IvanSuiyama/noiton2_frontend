@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
 import {
@@ -19,6 +20,7 @@ import {
   getUserId,
 } from '../../services/authService';
 import { deletarTarefa } from '../tarefa/dellTarefa';
+import { useTheme } from '../theme/ThemeContext';
 
 type CardTarefasNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -29,7 +31,6 @@ interface CardTarefasProps {
 
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
 import { getActiveWorkspaceName } from '../../services/authService';
-import GerenciarColaboradores from '../tarefa/gerenciarColaboradores';
 import WorkspaceInterface from '../workspace/workspaceInterface';
 
 // Usar a interface padrão do projeto
@@ -52,12 +53,6 @@ interface Filtros {
   tipo_recorrencia?: 'diaria' | 'semanal' | 'mensal'; // TODO: Backend precisa implementar
 }
 
-const PRIORIDADE_CORES = {
-  baixa: '#28a745',
-  media: '#ffc107',
-  alta: '#fd7e14',
-  urgente: '#dc3545',
-};
 
 const STATUS_LABELS = {
   a_fazer: 'A Fazer',
@@ -74,6 +69,7 @@ const PRIORIDADE_LABELS = {
 };
 
 const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => {
+  const { theme } = useTheme();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(false);
   const [palavraChave, setPalavraChave] = useState('');
@@ -87,14 +83,20 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   const [minhasTarefas, setMinhasTarefas] = useState<boolean>(false);
   const [recorrentes, setRecorrentes] = useState<boolean>(false);
   const [tipoRecorrencia, setTipoRecorrencia] = useState<'diaria' | 'semanal' | 'mensal' | undefined>(undefined);
-  const [showGerenciarColaboradores, setShowGerenciarColaboradores] = useState(false);
-  const [tarefaSelecionada, setTarefaSelecionada] = useState<Tarefa | null>(null);
+  const [favoritos, setFavoritos] = useState<number[]>([]);
+
+  const STORAGE_KEY = 'tarefas_favoritas';
 
 
   // Sempre que refreshKey mudar, ou workspaceId/workspaceInfo/userEmail, recarrega tudo
   useEffect(() => {
     initializeWorkspace();
   }, [refreshKey]);
+
+  // Carrega favoritos na inicialização
+  useEffect(() => {
+    carregarFavoritos();
+  }, []);
 
   // Só carrega tarefas quando workspaceId mudar
   useEffect(() => {
@@ -152,6 +154,64 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     }
   };
 
+  // Funções para gerenciar favoritos
+  const carregarFavoritos = async () => {
+    try {
+      const favoritosStorage = await AsyncStorage.getItem(STORAGE_KEY);
+      if (favoritosStorage) {
+        const favoritosData = JSON.parse(favoritosStorage);
+        const favoritosIds = favoritosData.map((fav: any) => fav.id);
+        setFavoritos(favoritosIds);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar favoritos:', error);
+    }
+  };
+
+  const toggleFavorito = async (tarefa: Tarefa) => {
+    try {
+      const favoritosStorage = await AsyncStorage.getItem(STORAGE_KEY);
+      let favoritosData = favoritosStorage ? JSON.parse(favoritosStorage) : [];
+      
+      const isFavorito = favoritosData.some((fav: any) => fav.id === tarefa.id_tarefa);
+      
+      if (isFavorito) {
+        // Remover dos favoritos
+        favoritosData = favoritosData.filter((fav: any) => fav.id !== tarefa.id_tarefa);
+        Alert.alert('Removido', 'Tarefa removida dos favoritos');
+      } else {
+        // Adicionar aos favoritos
+        const novoFavorito = {
+          id: tarefa.id_tarefa,
+          isPinned: false,
+          pinnedOrder: 0,
+          addedAt: new Date().getTime()
+        };
+        favoritosData.push(novoFavorito);
+        Alert.alert('Adicionado', 'Tarefa adicionada aos favoritos!');
+      }
+      
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(favoritosData));
+      
+      // Atualizar estado local
+      const novosIds = favoritosData.map((fav: any) => fav.id);
+      setFavoritos(novosIds);
+      
+    } catch (error) {
+      console.error('Erro ao gerenciar favorito:', error);
+      Alert.alert('Erro', 'Erro ao gerenciar favoritos');
+    }
+  };
+
+  const isFavorito = (tarefaId: number): boolean => {
+    return favoritos.includes(tarefaId);
+  };
+
+  // Carregar favoritos quando o componente montar
+  useEffect(() => {
+    carregarFavoritos();
+  }, []);
+
   // Função para verificar se o usuário logado é o criador da tarefa
   const isCreator = (tarefa: Tarefa): boolean => {
     if (!currentUserId) {
@@ -197,6 +257,8 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     }
     return '';
   };
+
+  // As permissões agora vêm diretamente do backend nas tarefas
 
   const carregarTarefas = async (filtrosCustom?: Filtros) => {
     if (!workspaceId) {
@@ -301,13 +363,17 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       
       // ❌ Filtro recorrentes (não existe no backend - aplicar localmente)
       if (filtrosAtivos.recorrentes) {
-        tarefasFiltradas = tarefasFiltradas.filter(tarefa => tarefa.recorrente === true);
+        tarefasFiltradas = tarefasFiltradas.filter(tarefa => {
+          // Verificar se a propriedade existe e é verdadeira
+          return Boolean(tarefa.recorrente);
+        });
         
         // ❌ Filtro tipo de recorrência (não existe no backend - aplicar localmente)
         if (filtrosAtivos.tipo_recorrencia) {
-          tarefasFiltradas = tarefasFiltradas.filter(tarefa => 
-            tarefa.recorrencia === filtrosAtivos.tipo_recorrencia
-          );
+          tarefasFiltradas = tarefasFiltradas.filter(tarefa => {
+            // Verificar se a propriedade existe e corresponde
+            return tarefa.recorrencia === filtrosAtivos.tipo_recorrencia;
+          });
         }
       }
       
@@ -325,6 +391,8 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         workspaceId,
         primeiras: tarefasOrdenadas.slice(0, 3).map(t => ({ id: t.id_tarefa, titulo: t.titulo }))
       });
+      
+      // As permissões já vêm do backend nas tarefas
       setTarefas(tarefasOrdenadas);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
@@ -396,9 +464,25 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     Alert.alert('Em desenvolvimento', 'Funcionalidade de comentários será implementada em breve');
   };
 
-  const handleGerenciarColaboradores = (tarefa: Tarefa) => {
-    setTarefaSelecionada(tarefa);
-    setShowGerenciarColaboradores(true);
+
+
+  const handleToggleConcluida = async (tarefa: Tarefa) => {
+    try {
+      const novoStatus = tarefa.status === 'concluido' ? 'a_fazer' : 'concluido';
+      const novaConcluida = novoStatus === 'concluido';
+      
+      // ✅ Usar o endpoint existente do backend: PUT /tarefas/:id_tarefa
+      await apiCall(`/tarefas/${tarefa.id_tarefa}`, 'PUT', {
+        status: novoStatus,
+        concluida: novaConcluida
+      });
+      
+      // Recarregar as tarefas para refletir a mudança
+      await carregarTarefas();
+    } catch (error) {
+      console.error('Erro ao alterar status da tarefa:', error);
+      Alert.alert('Erro', 'Não foi possível alterar o status da tarefa');
+    }
   };
 
   const handleDelete = (tarefa: Tarefa) => {
@@ -416,85 +500,98 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   };
 
   const renderTarefa = ({ item }: { item: Tarefa }) => {
-    console.log('🎯 Renderizando tarefa:', { 
-      id: item.id_tarefa, 
-      titulo: item.titulo, 
-      nivel_acesso: item.nivel_acesso,
-      workspaceInfo: workspaceInfo?.equipe 
-    });
-    
     const podeEditar = podeEditarTarefa(item);
     const podeApagar = podeApagarTarefa(item);
     const permissaoIcon = getPermissaoIcon(item);
     
     return (
-      <View style={styles.tarefaItem}>
+      <View style={[styles.tarefaItem, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.tarefaContent}>
-          <View style={styles.tarefaInfo}>
-            <View style={styles.tarefaTituloContainer}>
-              <Text style={styles.tarefaTitulo} numberOfLines={1}>
-                {item.titulo}
-              </Text>
-              {permissaoIcon && permissaoIcon.trim() !== '' && (
-                <Text style={styles.permissaoIcon}>{permissaoIcon}</Text>
+          {/* Checkbox de conclusão */}
+          <TouchableOpacity
+            style={styles.checkboxContainer}
+            onPress={() => handleToggleConcluida(item)}>
+            <View style={[
+              styles.checkbox,
+              item.status === 'concluido' && styles.checkboxChecked
+            ]}>
+              {item.status === 'concluido' && (
+                <Text style={styles.checkboxIcon}>✓</Text>
               )}
             </View>
+          </TouchableOpacity>
+
+          {/* Conteúdo da tarefa */}
+          <View style={styles.tarefaInfo}>
+            <View style={styles.tarefaTituloContainer}>
+              {/* Ícone de criador na frente do título (só para workspaces de equipe) */}
+              {permissaoIcon && permissaoIcon.trim() !== '' && workspaceInfo?.equipe && (
+                <Text style={styles.permissaoIcon}>{permissaoIcon}</Text>
+              )}
+              <Text style={[
+                styles.tarefaTitulo,
+                { color: theme.colors.text },
+                item.status === 'concluido' && styles.tarefaTituloConcluida
+              ]} numberOfLines={1}>
+                {item.titulo}
+              </Text>
+            </View>
+            
             {item.descricao && (
-              <Text style={styles.tarefaDescricao} numberOfLines={2}>
+              <Text style={[
+                styles.tarefaDescricao,
+                { color: theme.colors.textSecondary },
+                item.status === 'concluido' && styles.tarefaDescricaoConcluida
+              ]} numberOfLines={2}>
                 {item.descricao}
               </Text>
             )}
-            {/* Mostrar informações de permissão para debug */}
-            {__DEV__ && (
-              <Text style={styles.debugInfo}>
-                Nível: {item.nivel_acesso} | Editar: {podeEditar ? 'Sim' : 'Não'} | Apagar: {podeApagar ? 'Sim' : 'Não'}
-              </Text>
-            )}
-          </View>
-          
-          <View style={styles.tarefaActions}>
-            {/* Ícone de colaboradores - apenas para criadores E workspaces de equipe */}
-            {isCreator(item) && workspaceInfo?.equipe && (
+
+            {/* Botões de ação embaixo da descrição */}
+            <View style={styles.tarefaActionsBottom}>
+              {/* Ícone de editar - para criadores e editores */}
+              {podeEditar && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleEditarTarefa(item)}>
+                  <Text style={styles.actionIcon}>✏️</Text>
+                </TouchableOpacity>
+              )}
+              
+              {/* Ícone de deletar - apenas para criadores */}
+              {podeApagar && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item)}>
+                  <Text style={styles.actionIcon}>🗑️</Text>
+                </TouchableOpacity>
+              )}
+              
+              {/* Ícone de favorito - sempre visível */}
+              <TouchableOpacity
+                style={[styles.actionButton, isFavorito(item.id_tarefa) && styles.favoritoButton]}
+                onPress={() => toggleFavorito(item)}>
+                <Text style={styles.actionIcon}>
+                  {isFavorito(item.id_tarefa) ? '⭐' : '☆'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Ícone de visualizar - sempre visível */}
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => handleGerenciarColaboradores(item)}>
-                <Text style={styles.actionIcon}>👥</Text>
+                onPress={() => handleVerTarefa(item)}>
+                <Text style={styles.actionIcon}>👁️</Text>
               </TouchableOpacity>
-            )}
-            
-            {/* Ícone de editar - para criadores e editores */}
-            {podeEditar && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleEditarTarefa(item)}>
-                <Text style={styles.actionIcon}>✏️</Text>
-              </TouchableOpacity>
-            )}
-            
-            {/* Ícone de deletar - apenas para criadores */}
-            {podeApagar && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={() => handleDelete(item)}>
-                <Text style={styles.actionIcon}>🗑️</Text>
-              </TouchableOpacity>
-            )}
-            
-            {/* Ícone de visualizar - sempre visível */}
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleVerTarefa(item)}>
-              <Text style={styles.actionIcon}>👁️</Text>
-            </TouchableOpacity>
-            
-            {/* Ícone de comentário - futura implementação */}
-            {false && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleComentarTarefa(item)}>
-                <Text style={styles.actionIcon}>💬</Text>
-              </TouchableOpacity>
-            )}
+              
+              {/* Ícone de comentário - futura implementação */}
+              {false && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleComentarTarefa(item)}>
+                  <Text style={styles.actionIcon}>💬</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -517,20 +614,24 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Cabeçalho com filtro */}
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.filtroContainer}>
           <TouchableOpacity
-            style={styles.filtroIcon}
+            style={[styles.filtroIcon, { backgroundColor: theme.colors.background }]}
             onPress={() => setShowFiltroModal(true)}>
             <Text style={styles.filtroIconText}>⚙️</Text>
           </TouchableOpacity>
           
           <TextInput
-            style={styles.palavraChaveInput}
+            style={[styles.palavraChaveInput, { 
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              borderColor: theme.colors.border 
+            }]}
             placeholder="Buscar por palavra-chave..."
-            placeholderTextColor="#6c757d"
+            placeholderTextColor={theme.colors.textSecondary}
             value={palavraChave}
             onChangeText={setPalavraChave}
             returnKeyType="search"
@@ -545,84 +646,10 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         </View>
       </View>
 
-      {/* Filtro recorrentes destacado */}
-      <View style={styles.filtroRecorrentesBar}>
+      {/* Botão Criar Tarefa */}
+      <View style={styles.criarTarefaContainer}>
         <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 0 }}
-          onPress={async () => {
-            const novoRecorrente = !recorrentes;
-            setRecorrentes(novoRecorrente);
-            setTipoRecorrencia(undefined);
-            
-            const novosFiltros = {
-              ...filtros,
-              recorrentes: novoRecorrente,
-              tipo_recorrencia: undefined
-            };
-            
-            setFiltros(novosFiltros);
-            await carregarTarefas(novosFiltros);
-          }}
-        >
-          <View style={{
-            width: 22,
-            height: 22,
-            borderRadius: 6,
-            borderWidth: 2,
-            borderColor: '#28a745',
-            backgroundColor: recorrentes ? '#28a745' : 'transparent',
-            marginRight: 10,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-            {recorrentes && (
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
-            )}
-          </View>
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
-            Mostrar apenas tarefas recorrentes
-          </Text>
-        </TouchableOpacity>
-        {/* Select tipo de recorrência */}
-        {recorrentes && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-            <Text style={{ color: '#fff', fontSize: 15, marginRight: 10 }}>Tipo:</Text>
-            {['diaria', 'semanal', 'mensal'].map(tipo => (
-              <TouchableOpacity
-                key={tipo}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: tipoRecorrencia === tipo ? '#28a745' : '#404040',
-                  backgroundColor: tipoRecorrencia === tipo ? '#28a745' : 'transparent',
-                  marginRight: 8,
-                }}
-                onPress={async () => {
-                  const novoTipo = tipoRecorrencia === tipo ? undefined : tipo as any;
-                  setTipoRecorrencia(novoTipo);
-                  
-                  const novosFiltros = {
-                    ...filtros,
-                    tipo_recorrencia: novoTipo
-                  };
-                  
-                  setFiltros(novosFiltros);
-                  await carregarTarefas(novosFiltros);
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: tipoRecorrencia === tipo ? 'bold' : 'normal' }}>
-                  {tipo === 'diaria' ? 'Dia' : tipo === 'semanal' ? 'Semana' : 'Mês'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Botão Criar Tarefa */}
-        <TouchableOpacity
-          style={[styles.criarTarefaButton, { marginTop: 16, alignSelf: 'center' }]}
+          style={styles.criarTarefaButton}
           onPress={handleCriarTarefa}
         >
           <Text style={styles.criarTarefaButtonText}>➕ Criar Tarefa</Text>
@@ -631,34 +658,20 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
       {/* Lista de tarefas */}
       <View style={styles.tarefasContainer}>
-        {(() => {
-          console.log('🔍 Estado de renderização:', { 
-            loading, 
-            tarefasLength: tarefas.length, 
-            workspaceId, 
-            workspaceInfo: workspaceInfo?.nome 
-          });
-          return null;
-        })()}
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Carregando tarefas...</Text>
           </View>
+        ) : tarefas.length === 0 ? (
+          renderEmptyState()
         ) : (
-          <View>
-            <Text style={{color: '#fff', padding: 10}}>DEBUG: Tarefas encontradas: {tarefas.length}</Text>
-            {tarefas.length === 0 ? (
-              renderEmptyState()
-            ) : (
-              <FlatList
-                data={tarefas}
-                keyExtractor={(item) => item.id_tarefa.toString()}
-                renderItem={renderTarefa}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.listContainer}
-              />
-            )}
-          </View>
+          <FlatList
+            data={tarefas}
+            keyExtractor={(item) => item.id_tarefa.toString()}
+            renderItem={renderTarefa}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+          />
         )}
       </View>
 
@@ -850,19 +863,6 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         </View>
       </Modal>
 
-      {/* Modal de Gerenciar Colaboradores */}
-      {tarefaSelecionada && (
-        <GerenciarColaboradores
-          visible={showGerenciarColaboradores}
-          onClose={() => {
-            setShowGerenciarColaboradores(false);
-            setTarefaSelecionada(null);
-          }}
-          tarefaId={tarefaSelecionada.id_tarefa}
-          tarefaTitulo={tarefaSelecionada.titulo}
-          workspaceEquipe={workspaceInfo?.equipe || false}
-        />
-      )}
     </View>
   );
 };
@@ -918,15 +918,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   
-  filtroRecorrentesBar: {
-    flexDirection: 'column',
-    backgroundColor: '#232e23',
+  criarTarefaContainer: {
+    backgroundColor: '#2a2a2a',
     borderBottomWidth: 1,
-    borderBottomColor: '#28a745',
-    paddingHorizontal: 18,
+    borderBottomColor: '#3a3a3a',
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    alignItems: 'flex-start',
-    gap: 4,
+    alignItems: 'center',
   },
   tarefasContainer: {
     flex: 1,
@@ -987,6 +985,10 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: 'rgba(220, 53, 69, 0.3)', // Cor vermelha para o botão de deletar
   },
+
+  favoritoButton: {
+    backgroundColor: 'rgba(255, 193, 7, 0.3)', // Cor amarelada para favoritos
+  },
   
   actionIcon: {
     fontSize: 16,
@@ -1034,10 +1036,15 @@ const styles = StyleSheet.create({
   },
   
   criarTarefaButton: {
-    backgroundColor: 'rgba(108, 117, 125, 0.8)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    backgroundColor: '#007bff',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
     borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   
   criarTarefaButtonText: {
@@ -1191,14 +1198,57 @@ const styles = StyleSheet.create({
   
   permissaoIcon: {
     fontSize: 16,
-    marginLeft: 8,
+    marginRight: 8,
   },
   
-  debugInfo: {
-    color: '#6c757d',
-    fontSize: 10,
-    marginTop: 4,
-    fontStyle: 'italic',
+  // Estilos para o checkbox de conclusão
+  checkboxContainer: {
+    padding: 4,
+    marginRight: 12,
+  },
+  
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#6c757d',
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  checkboxChecked: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
+  },
+  
+  checkboxIcon: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  
+  // Estilos para tarefas concluídas
+  tarefaTituloConcluida: {
+    textDecorationLine: 'line-through',
+    opacity: 0.6,
+  },
+  
+  tarefaDescricaoConcluida: {
+    textDecorationLine: 'line-through',
+    opacity: 0.6,
+  },
+  
+  // Novo estilo para ações embaixo
+  tarefaActionsBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#404040',
   },
 });
 

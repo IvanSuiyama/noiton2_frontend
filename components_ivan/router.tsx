@@ -1,6 +1,7 @@
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
+import { ThemeProvider } from './theme/ThemeContext';
 
 // Telas de Autenticação e Boas-vindas
 import WelcomeScreen from './welcome/WelcomeScreen';
@@ -26,6 +27,11 @@ import CadCategoria from './categoria/cadCategoria';
 
 // Tela Principal
 import HomeScreen from './home/HomeScreen';
+
+// Novas Telas
+import CardFavoritos from './cards/cardFavoritos';
+import ConfiguracoesScreen from './configuracoes/ConfiguracoesScreen';
+import CalendarioScreen from './calendario/CalendarioScreen';
 
 // Definir tipos para as rotas
 export type RootStackParamList = {
@@ -69,14 +75,20 @@ export type RootStackParamList = {
   
   // Categorias
   CadastroCategoria: undefined;
+  
+  // Novas telas
+  CardFavoritos: undefined;
+  Configuracoes: undefined;
+  Calendario: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 const Router: React.FC = () => {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
+    <ThemeProvider>
+      <NavigationContainer>
+        <Stack.Navigator
         initialRouteName="Welcome"
         screenOptions={{
           headerStyle: {
@@ -231,8 +243,41 @@ const Router: React.FC = () => {
           }}
         />
 
-      </Stack.Navigator>
-    </NavigationContainer>
+        {/* ========== NOVAS FUNCIONALIDADES ========== */}
+        
+        {/* Tarefas Favoritas */}
+        <Stack.Screen
+          name="CardFavoritos"
+          component={CardFavoritos}
+          options={{
+            title: 'Favoritos',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        {/* Configurações */}
+        <Stack.Screen
+          name="Configuracoes"
+          component={ConfiguracoesScreen}
+          options={{
+            title: 'Configurações',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        {/* Calendário */}
+        <Stack.Screen
+          name="Calendario"
+          component={CalendarioScreen}
+          options={{
+            title: 'Calendário',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ThemeProvider>
   );
 };
 

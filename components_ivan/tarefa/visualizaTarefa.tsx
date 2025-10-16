@@ -13,6 +13,7 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../router';
 import { apiCall, getActiveWorkspaceId } from '../../services/authService';
 import TarefaMultiplaInterface from './tarefaMultiplaInterface';
+import GerenciarPermissoesModal from '../permissoes/GerenciarPermissoesModal';
 
 type VisualizaTarefaNavigationProp = StackNavigationProp<RootStackParamList, 'VisualizaTarefa'>;
 type VisualizaTarefaRouteProp = RouteProp<RootStackParamList, 'VisualizaTarefa'>;
@@ -57,6 +58,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
   const [tarefa, setTarefa] = useState<TarefaCompleta | null>(null);
   const [loading, setLoading] = useState(true);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [permissoesModalVisible, setPermissoesModalVisible] = useState(false);
 
   // Parâmetros da rota - pode receber id_tarefa OU titulo
   const { id_tarefa, titulo } = route.params || {};
@@ -308,7 +310,30 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
             <Text style={styles.infoValue}>{tarefa.id_workspace}</Text>
           </View>
         </View> */}
+
+        {/* Botões de Ação */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.permissaoButton}
+            onPress={() => setPermissoesModalVisible(true)}>
+            <Text style={styles.permissaoButtonText}>👥 Gerenciar Permissões</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Modal de Gerenciar Permissões */}
+      {tarefa && workspaceId && (
+        <GerenciarPermissoesModal
+          visible={permissoesModalVisible}
+          onClose={() => setPermissoesModalVisible(false)}
+          idTarefa={tarefa.id_tarefa}
+          idWorkspace={workspaceId}
+          tituloTarefa={tarefa.titulo}
+          onPermissaoAlterada={() => {
+            console.log('Permissões alteradas para tarefa:', tarefa.titulo);
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -530,6 +555,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 20,
     textAlign: 'center',
+  },
+
+  actionButtons: {
+    padding: 16,
+    marginTop: 20,
+  },
+
+  permissaoButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  permissaoButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

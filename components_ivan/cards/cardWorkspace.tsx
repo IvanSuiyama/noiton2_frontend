@@ -18,6 +18,7 @@ import {
   getUserEmail,
 } from '../../services/authService';
 import WorkspaceInterface from '../workspace/workspaceInterface';
+import { useTheme } from '../theme/ThemeContext';
 
 type CardWorkspaceNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -27,9 +28,10 @@ interface CardWorkspaceProps {
 }
 
 const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceChange }) => {
+  const { theme } = useTheme();
   const pencilIconStyle = {
     fontSize: 18,
-    color: 'rgba(108, 117, 125, 0.9)',
+    color: theme.colors.textSecondary,
     marginRight: 12,
   };
 
@@ -130,15 +132,15 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
     <View style={styles.container}>
       {/* Card Pequeno (igual ao CardUser) */}
       <TouchableOpacity
-        style={styles.workspaceCard}
+        style={[styles.workspaceCard, { backgroundColor: theme.colors.surface }]}
         onPress={() => {
           refreshWorkspaces();
           setShowWorkspaceModal(true);
         }}
         disabled={userWorkspaces.length === 0}
       >
-        <View style={styles.workspaceIcon}>
-          <Text style={styles.workspaceIconText}>
+        <View style={[styles.workspaceIcon, { backgroundColor: theme.colors.background }]}>
+          <Text style={[styles.workspaceIconText, { color: theme.colors.text }]}>
             {workspaceName.charAt(0).toUpperCase()}
           </Text>
         </View>
@@ -152,9 +154,9 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
         onRequestClose={() => setShowWorkspaceModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.workspaceModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selecionar Workspace</Text>
+          <View style={[styles.workspaceModal, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Selecionar Workspace</Text>
               <TouchableOpacity 
                 onPress={() => setShowWorkspaceModal(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

@@ -420,6 +420,7 @@ export const buscarWorkspacePorId = async (id_workspace: number): Promise<any> =
 export const adicionarPermissaoTarefa = async (id_tarefa: number, id_usuario: number, nivel_acesso: number) => {
   try {
     const response = await apiCall(`/tarefas/${id_tarefa}/permissoes`, 'POST', {
+      id_tarefa,
       id_usuario,
       nivel_acesso
     });
