@@ -246,7 +246,7 @@ const CardFavoritos: React.FC<CardFavoritosProps> = ({ navigation }) => {
         <TouchableOpacity
           style={[styles.actionButton, styles.removeButton]}
           onPress={() => removerFavorito(tarefa.id_tarefa)}>
-          <Text style={styles.actionIcon}>🗑️</Text>
+          <Text style={styles.actionIcon}>⭐</Text>
         </TouchableOpacity>
       </View>
     </View>

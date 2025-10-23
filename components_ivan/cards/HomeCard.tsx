@@ -16,7 +16,7 @@ import {
 } from '../../services/authService';
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
 import { useTheme } from '../theme/ThemeContext';
-import ProgressChart from '../charts/ProgressChart';
+
 
 interface HomeCardProps {
   navigation: StackNavigationProp<RootStackParamList>;
@@ -30,10 +30,6 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   const [workspaceName, setWorkspaceName] = useState<string>('');
   const [workspaceIsTeam, setWorkspaceIsTeam] = useState<boolean>(false);
-  const [progressData, setProgressData] = useState({
-    usuario: { total: 0, concluidas: 0, atrasadas: 0 },
-    equipe: { total: 0, concluidas: 0, atrasadas: 0 },
-  });
 
   useEffect(() => {
     initializeData();
@@ -52,8 +48,7 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
         
         await Promise.all([
           carregarTarefasRecentes(id),
-          carregarTarefasUrgentes(id),
-          carregarDadosProgresso(id),
+          carregarTarefasUrgentes(id), // Agora carrega tarefas perto de vencer
         ]);
       }
     } catch (error) {
@@ -74,47 +69,7 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
     }
   };
 
-  // Carregar dados de progresso (tarefas do usuário e da equipe)
-  const carregarDadosProgresso = async (wsId: number) => {
-    try {
-      const todasTarefas = await apiCall(`/tarefas/workspace/${wsId}`, 'GET');
-      const usuarioId = await apiCall('/usuarios/me', 'GET').then(res => res.id_usuario);
-      const hoje = new Date();
 
-      // Calcular estatísticas do usuário
-      const tarefasUsuario = todasTarefas.filter((tarefa: TarefaMultiplaInterface) => 
-        tarefa.id_usuario === usuarioId
-      );
-      
-      const usuarioStats = calcularEstatisticas(tarefasUsuario, hoje);
-      
-      // Calcular estatísticas da equipe (todas as tarefas)
-      const equipeStats = calcularEstatisticas(todasTarefas, hoje);
-
-      setProgressData({
-        usuario: usuarioStats,
-        equipe: equipeStats,
-      });
-    } catch (error) {
-      console.error('Erro ao carregar dados de progresso:', error);
-    }
-  };
-
-  // Função auxiliar para calcular estatísticas
-  const calcularEstatisticas = (tarefas: TarefaMultiplaInterface[], hoje: Date) => {
-    const total = tarefas.length;
-    const concluidas = tarefas.filter(t => t.status === 'concluido').length;
-    
-    const atrasadas = tarefas.filter(t => {
-      if (t.status === 'concluido' || !t.data_fim) {
-        return false;
-      }
-      const dataFim = new Date(t.data_fim);
-      return dataFim < hoje;
-    }).length;
-
-    return { total, concluidas, atrasadas };
-  };
 
   // Carregar as 3 tarefas mais recentes criadas
   const carregarTarefasRecentes = async (wsId: number) => {
@@ -135,28 +90,40 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
     }
   };
 
-  // Carregar as 3 tarefas mais urgentes (data fim próxima)
+  // Carregar as tarefas perto de vencer (1 ou 2 dias)
   const carregarTarefasUrgentes = async (wsId: number) => {
     try {
       const todasTarefas = await apiCall(`/tarefas/workspace/${wsId}`, 'GET');
       const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0); // Zerar horas para comparação apenas de data
       
-      const tarefasComDataFim = todasTarefas
+      // Data limite: 2 dias a partir de hoje
+      const limiteData = new Date(hoje);
+      limiteData.setDate(hoje.getDate() + 2);
+      
+      const tarefasPertoDeVencer = todasTarefas
         .filter((tarefa: TarefaMultiplaInterface) => {
-          return tarefa.status !== 'concluido' && tarefa.data_fim;
+          if (tarefa.status === 'concluido' || !tarefa.data_fim) {
+            return false;
+          }
+          
+          const dataFim = new Date(tarefa.data_fim);
+          dataFim.setHours(0, 0, 0, 0); // Zerar horas para comparação apenas de data
+          
+          // Verificar se a data fim é hoje, amanhã ou depois de amanhã
+          return dataFim >= hoje && dataFim <= limiteData;
         })
         .sort((a: TarefaMultiplaInterface, b: TarefaMultiplaInterface) => {
+          // Ordenar por data fim (mais próximas primeiro)
           const dataA = new Date(a.data_fim!).getTime();
           const dataB = new Date(b.data_fim!).getTime();
-          const diffA = Math.abs(dataA - hoje.getTime());
-          const diffB = Math.abs(dataB - hoje.getTime());
-          return diffA - diffB;
+          return dataA - dataB;
         })
         .slice(0, 3);
       
-      setTarefasUrgentes(tarefasComDataFim);
+      setTarefasUrgentes(tarefasPertoDeVencer);
     } catch (error) {
-      console.error('Erro ao carregar tarefas urgentes:', error);
+      console.error('Erro ao carregar tarefas perto de vencer:', error);
     }
   };
 
@@ -229,45 +196,14 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      {/* Cabeçalho */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>🏠 Dashboard</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>{workspaceName}</Text>
-      </View>
+
 
       {/* Dia atual */}
       <View style={[styles.dateSection, { backgroundColor: theme.colors.background }]}>
         <Text style={[styles.dateText, { color: theme.colors.text }]}>{formatarDataHoje()}</Text>
       </View>
 
-      {/* Gráficos de Progresso */}
-      <View style={styles.progressSection}>
-        {workspaceIsTeam ? (
-          // Workspace de Equipe - Mostrar dois gráficos
-          <>
-            <ProgressChart
-              title="📊 Progresso Individual"
-              totalTasks={progressData.usuario.total}
-              completedTasks={progressData.usuario.concluidas}
-              overdueTasks={progressData.usuario.atrasadas}
-            />
-            <ProgressChart
-              title="👥 Progresso da Equipe"
-              totalTasks={progressData.equipe.total}
-              completedTasks={progressData.equipe.concluidas}
-              overdueTasks={progressData.equipe.atrasadas}
-            />
-          </>
-        ) : (
-          // Workspace Individual - Mostrar apenas um gráfico
-          <ProgressChart
-            title="📊 Meu Progresso"
-            totalTasks={progressData.usuario.total}
-            completedTasks={progressData.usuario.concluidas}
-            overdueTasks={progressData.usuario.atrasadas}
-          />
-        )}
-      </View>
+
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Tarefas Mais Recentes */}
@@ -284,15 +220,15 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Tarefas Mais Urgentes */}
+        {/* Tarefas Perto de Vencer */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>🚨 Tarefas Urgentes</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>⏰ Tarefas Perto de Vencer</Text>
           <View style={[styles.tarefasContainer, { backgroundColor: theme.colors.background }]}>
             {tarefasUrgentes.length > 0 ? (
               tarefasUrgentes.map(renderTarefa)
             ) : (
               <View style={styles.emptyState}>
-                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>Nenhuma tarefa urgente</Text>
+                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>Nenhuma tarefa perto de vencer</Text>
               </View>
             )}
           </View>

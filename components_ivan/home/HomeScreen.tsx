@@ -80,17 +80,17 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header Superior com Cards */}
       <View style={[styles.topHeader, { backgroundColor: theme.colors.background }]}>
-        <CardWorkspace navigation={navigation} />
-        <View style={{ marginRight: 90 }}>
+        <View style={styles.workspaceCard}>
+          <CardWorkspace navigation={navigation} />
+        </View>
+        <View style={styles.membrosCard}>
           <CardMembros refreshKey={workspaceRefreshKey} />
         </View>
         <CardUser navigation={navigation} />
       </View>
 
-      {/* Cabeçalho com Data Atual */}
-      <View style={styles.dateHeader}>
-        <Text style={[styles.dateText, { color: theme.colors.text }]}>{currentDate}</Text>
-      </View>
+      {/* Espaço Central Livre */}
+      <View style={styles.centerSpace} />
 
       {/* Menu de Navegação */}
       <View style={[styles.tabsContainer, { 
@@ -208,8 +208,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    gap: 12,
     minHeight: 80,
+  },
+
+  workspaceCard: {
+    marginRight: -60, // Aproxima mais do centro
+  },
+
+  membrosCard: {
+    marginLeft: -110, // Aproxima muito mais do card de workspace
   },
   
   dateHeader: {
@@ -222,6 +229,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
+  },
+
+  centerSpace: {
+    height: 150,
+    backgroundColor: 'transparent',
   },
 
   tabsContainer: {

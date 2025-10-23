@@ -39,18 +39,15 @@ interface Tarefa extends TarefaMultiplaInterface {
 }
 
 interface Filtros {
-  // ✅ Filtros suportados pelo backend
-  palavras_chave?: string;    // Backend: busca em título e descrição
-  status?: string;            // Backend: status exato
-  prioridade?: string;        // Backend: prioridade exata
-  categoria_nome?: string;    // Backend: nome da categoria (ILIKE)
-  
-  // ✅ Filtros convertidos para backend
-  minhas_tarefas?: boolean;   // Frontend: converte para id_usuario no backend
-  
-  // ❌ Filtros NÃO suportados pelo backend (mantidos para futuro)
-  recorrentes?: boolean;      // TODO: Backend precisa implementar
-  tipo_recorrencia?: 'diaria' | 'semanal' | 'mensal'; // TODO: Backend precisa implementar
+  // ✅ Todos os filtros agora suportados pelo backend
+  palavras_chave?: string;                               // Busca em título e descrição
+  status?: string;                                       // Status exato da tarefa
+  prioridade?: string;                                   // Prioridade exata da tarefa
+  categoria_nome?: string;                               // Nome da categoria (ILIKE)
+  minhas_tarefas?: boolean;                             // Tarefas do usuário logado
+  recorrentes?: boolean;                                // Tarefas marcadas como recorrentes
+  tipo_recorrencia?: 'diaria' | 'semanal' | 'mensal'; // Tipo específico de recorrência
+  tarefas_com_prazo?: boolean;                          // ✨ NOVO: Apenas tarefas com data_fim
 }
 
 
@@ -84,6 +81,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   const [recorrentes, setRecorrentes] = useState<boolean>(false);
   const [tipoRecorrencia, setTipoRecorrencia] = useState<'diaria' | 'semanal' | 'mensal' | undefined>(undefined);
   const [favoritos, setFavoritos] = useState<number[]>([]);
+  const [tarefasComPrazo, setTarefasComPrazo] = useState<boolean>(false);
 
   const STORAGE_KEY = 'tarefas_favoritas';
 
@@ -260,6 +258,8 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
   // As permissões agora vêm diretamente do backend nas tarefas
 
+  // ✅ REMOVIDO: Filtros agora são aplicados no backend
+
   const carregarTarefas = async (filtrosCustom?: Filtros) => {
     if (!workspaceId) {
       setTarefas([]);
@@ -267,55 +267,54 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     }
     setLoading(true);
     try {
-      // Usar endpoint correto baseado se há filtros ou não
+      // ✅ NOVA IMPLEMENTAÇÃO: Usar filtros do backend
       const filtrosAtivos = filtrosCustom || filtros;
       const temFiltros = Object.keys(filtrosAtivos).length > 0;
       
       let endpoint: string;
+      let dadosTarefas: Tarefa[];
       
       if (temFiltros) {
-        // Usar endpoint de filtros do backend
-        endpoint = `/workspaces/${workspaceId}/tarefas/filtros`;
-        const queryParams = new URLSearchParams();
+        // ✨ Usar nova rota de filtros avançados do backend
+        const params = new URLSearchParams();
         
-        // Filtro por palavra-chave (✅ existe no backend)
+        // Mapear filtros para parâmetros da API
         if (filtrosAtivos.palavras_chave?.trim()) {
-          queryParams.append('palavras_chave', filtrosAtivos.palavras_chave.trim());
+          params.append('palavras_chave', filtrosAtivos.palavras_chave.trim());
         }
-        
-        // Filtro por status (✅ existe no backend)
         if (filtrosAtivos.status) {
-          queryParams.append('status', filtrosAtivos.status);
+          params.append('status', filtrosAtivos.status);
         }
-        
-        // Filtro por prioridade (✅ existe no backend)
         if (filtrosAtivos.prioridade) {
-          queryParams.append('prioridade', filtrosAtivos.prioridade);
+          params.append('prioridade', filtrosAtivos.prioridade);
         }
-        
-        // Filtro por categoria (✅ existe no backend)
         if (filtrosAtivos.categoria_nome?.trim()) {
-          queryParams.append('categoria_nome', filtrosAtivos.categoria_nome.trim());
+          params.append('categoria_nome', filtrosAtivos.categoria_nome.trim());
+        }
+        if (filtrosAtivos.minhas_tarefas) {
+          params.append('minhas_tarefas', 'true');
+        }
+        if (filtrosAtivos.recorrentes) {
+          params.append('recorrentes', 'true');
+        }
+        if (filtrosAtivos.tipo_recorrencia) {
+          params.append('tipo_recorrencia', filtrosAtivos.tipo_recorrencia);
+        }
+        if (filtrosAtivos.tarefas_com_prazo) {
+          params.append('tarefas_com_prazo', 'true');
         }
         
-        // Filtro minhas tarefas (❌ NÃO existe - usar id_usuario)
-        if (filtrosAtivos.minhas_tarefas && currentUserId) {
-          queryParams.append('id_usuario', currentUserId.toString());
-        }
+        endpoint = `/tarefas/workspace/${workspaceId}/filtros-avancados?${params.toString()}`;
+        console.log('� Usando filtros do backend:', endpoint);
         
-        // ❌ REMOVIDO: Filtros recorrentes não existem no backend
-        // Backend não suporta: recorrentes, tipo_recorrencia
-        
-        if (queryParams.toString()) {
-          endpoint += `?${queryParams.toString()}`;
-        }
+        dadosTarefas = await apiCall(endpoint, 'GET');
       } else {
-        // Sem filtros - usar endpoint simples
+        // Sem filtros: usar endpoint simples
         endpoint = `/tarefas/workspace/${workspaceId}`;
+        console.log('📡 Carregando todas as tarefas:', endpoint);
+        
+        dadosTarefas = await apiCall(endpoint, 'GET');
       }
-      
-      console.log('📡 Chamando endpoint para workspace', workspaceId, ':', endpoint);
-      const dadosTarefas: Tarefa[] = await apiCall(endpoint, 'GET');
       
       // Tarefas carregadas com sucesso
       
@@ -424,6 +423,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     setMinhasTarefas(!!novosFiltros.minhas_tarefas);
     setRecorrentes(!!novosFiltros.recorrentes);
     setTipoRecorrencia(novosFiltros.tipo_recorrencia);
+    setTarefasComPrazo(!!novosFiltros.tarefas_com_prazo);
     await carregarTarefas(filtrosCompletos);
     setShowFiltroModal(false);
   };
@@ -434,6 +434,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     setMinhasTarefas(false);
     setRecorrentes(false);
     setTipoRecorrencia(undefined);
+    setTarefasComPrazo(false);
     setPalavraChave('');
     await carregarTarefas(filtrosVazios);
     setShowFiltroModal(false);
@@ -842,6 +843,33 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                     ))}
                   </View>
                 )}
+              </View>
+
+              {/* Filtro Tarefas com Prazo */}
+              <View style={styles.filtroSection}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}
+                  onPress={() => setFiltros(prev => ({ ...prev, tarefas_com_prazo: !prev.tarefas_com_prazo }))}
+                >
+                  <View style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    borderWidth: 2,
+                    borderColor: '#ffc107',
+                    backgroundColor: filtros.tarefas_com_prazo ? '#ffc107' : 'transparent',
+                    marginRight: 10,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    {filtros.tarefas_com_prazo && (
+                      <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
+                    )}
+                  </View>
+                  <Text style={{ color: '#fff', fontSize: 16 }}>
+                    Mostrar apenas tarefas com prazo definido
+                  </Text>
+                </TouchableOpacity>
               </View>
 
 
