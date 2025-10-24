@@ -188,7 +188,7 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
       <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={[styles.loadingText, { color: theme.colors.text }]}>Carregando dashboard...</Text>
+          <Text style={[styles.loadingText, { color: theme.colors.text }]}>Carregando...</Text>
         </View>
       </View>
     );

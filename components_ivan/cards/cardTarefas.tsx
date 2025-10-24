@@ -21,6 +21,7 @@ import {
 } from '../../services/authService';
 import { deletarTarefa } from '../tarefa/dellTarefa';
 import { useTheme } from '../theme/ThemeContext';
+import ModalDenuncia from '../denuncia/ModalDenuncia';
 
 type CardTarefasNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -82,6 +83,10 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   const [tipoRecorrencia, setTipoRecorrencia] = useState<'diaria' | 'semanal' | 'mensal' | undefined>(undefined);
   const [favoritos, setFavoritos] = useState<number[]>([]);
   const [tarefasComPrazo, setTarefasComPrazo] = useState<boolean>(false);
+  
+  // Estados do modal de denúncia
+  const [showDenunciaModal, setShowDenunciaModal] = useState(false);
+  const [tarefaDenuncia, setTarefaDenuncia] = useState<Tarefa | null>(null);
 
   const STORAGE_KEY = 'tarefas_favoritas';
 
@@ -460,10 +465,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     navigation.navigate('VisualizaTarefa', { id_tarefa: tarefa.id_tarefa });
   };
 
-  const handleComentarTarefa = (tarefa: Tarefa) => {
-    // TODO: Navegar para tela de comentários da tarefa
-    Alert.alert('Em desenvolvimento', 'Funcionalidade de comentários será implementada em breve');
-  };
+
 
 
 
@@ -498,6 +500,16 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         console.error('Erro ao deletar tarefa:', error);
       },
     });
+  };
+
+  const handleDenunciarTarefa = (tarefa: Tarefa) => {
+    setTarefaDenuncia(tarefa);
+    setShowDenunciaModal(true);
+  };
+
+  const handleCloseDenunciaModal = () => {
+    setShowDenunciaModal(false);
+    setTarefaDenuncia(null);
   };
 
   const renderTarefa = ({ item }: { item: Tarefa }) => {
@@ -584,14 +596,12 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                 <Text style={styles.actionIcon}>👁️</Text>
               </TouchableOpacity>
               
-              {/* Ícone de comentário - futura implementação */}
-              {false && (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleComentarTarefa(item)}>
-                  <Text style={styles.actionIcon}>💬</Text>
-                </TouchableOpacity>
-              )}
+              {/* Ícone de denúncia */}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleDenunciarTarefa(item)}>
+                <Text style={styles.actionIcon}>⚠️</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -675,6 +685,14 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
           />
         )}
       </View>
+
+      {/* Modal de Denúncia */}
+      <ModalDenuncia 
+        visible={showDenunciaModal}
+        idTarefa={tarefaDenuncia?.id_tarefa || 0}
+        tituloTarefa={tarefaDenuncia?.titulo || ''}
+        onClose={handleCloseDenunciaModal}
+      />
 
       {/* Modal de Filtros */}
       <Modal

@@ -25,6 +25,10 @@ import VisualizaTarefa from './tarefa/visualizaTarefa';
 // Telas de Categoria
 import CadCategoria from './categoria/cadCategoria';
 
+// Telas de Comentário
+import CadComentario from './comentario/cadComentario';
+import EditComentarioScreen from './comentario/EditComentarioScreen';
+
 // Tela Principal
 import HomeScreen from './home/HomeScreen';
 
@@ -32,6 +36,7 @@ import HomeScreen from './home/HomeScreen';
 import CardFavoritos from './cards/cardFavoritos';
 import ConfiguracoesScreen from './configuracoes/ConfiguracoesScreen';
 import CalendarioScreen from './calendario/CalendarioScreen';
+import CardDashboard from './cards/CardDashboard';
 
 // Definir tipos para as rotas
 export type RootStackParamList = {
@@ -76,10 +81,15 @@ export type RootStackParamList = {
   // Categorias
   CadastroCategoria: undefined;
   
+  // Comentários
+  CadComentario: { id_tarefa: number; titulo: string };
+  EditComentario: { comentario: any; id_tarefa: number; titulo_tarefa: string };
+  
   // Novas telas
   CardFavoritos: undefined;
   Configuracoes: undefined;
   Calendario: undefined;
+  Dashboard: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -243,6 +253,26 @@ const Router: React.FC = () => {
           }}
         />
 
+        {/* ========== GESTÃO DE COMENTÁRIOS ========== */}
+        
+        {/* Comentários de Tarefa */}
+        <Stack.Screen
+          name="CadComentario"
+          component={CadComentario}
+          options={{
+            headerShown: false, // Usando header customizado
+          }}
+        />
+
+        {/* Editar Comentário */}
+        <Stack.Screen
+          name="EditComentario"
+          component={EditComentarioScreen}
+          options={{
+            headerShown: false, // Usando header customizado
+          }}
+        />
+
         {/* ========== NOVAS FUNCIONALIDADES ========== */}
         
         {/* Tarefas Favoritas */}
@@ -271,6 +301,16 @@ const Router: React.FC = () => {
           component={CalendarioScreen}
           options={{
             title: 'Calendário',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        {/* Dashboard */}
+        <Stack.Screen
+          name="Dashboard"
+          component={CardDashboard}
+          options={{
+            title: 'Dashboard',
             headerBackTitleVisible: false,
           }}
         />

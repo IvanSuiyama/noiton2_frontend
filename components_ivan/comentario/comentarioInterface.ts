@@ -1,22 +1,34 @@
-// Interface para comentários de tarefas - Atualizada para nova arquitetura
+// Interface para comentários de tarefas - Alinhada com backend
 interface ComentarioInterface {
   id_comentario: number;
-  conteudo: string; // Mudança: de 'texto' para 'conteudo'
-  data_criacao: string; // Mudança: de Date para string (ISO)
-  email_autor: string; // Mudança: de id_usuario para email_autor
+  email: string;
   id_tarefa: number;
+  descricao: string;
+  data_criacao: string;
+  data_atualizacao: string;
+  
+  // Campos adicionais (se houver joins no backend)
+  nome_usuario?: string;
+  titulo_tarefa?: string;
 }
 
 // Interface para criar novo comentário
-export interface CriarComentarioInterface {
-  conteudo: string;
+export interface CreateComentarioInterface {
   id_tarefa: number;
-  email_autor: string; // Será obtido do token JWT
+  descricao: string;
+  // email será obtido automaticamente do token JWT
 }
 
-// Interface para atualizar comentário existente
-export interface AtualizarComentarioInterface {
-  conteudo: string;
+// Interface para editar comentário
+export interface EditComentarioInterface {
+  descricao: string;
+}
+
+// Interface para resposta da API
+export interface ComentarioResponse {
+  success: boolean;
+  message?: string;
+  data?: ComentarioInterface | ComentarioInterface[];
 }
 
 export default ComentarioInterface;

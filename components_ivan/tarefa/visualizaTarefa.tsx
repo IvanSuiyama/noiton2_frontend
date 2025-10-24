@@ -9,11 +9,12 @@ import {
   Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../router';
 import { apiCall, getActiveWorkspaceId } from '../../services/authService';
 import TarefaMultiplaInterface from './tarefaMultiplaInterface';
 import GerenciarPermissoesModal from '../permissoes/GerenciarPermissoesModal';
+import { confirmarDeletarComentario } from '../comentario/dellComentario';
 
 type VisualizaTarefaNavigationProp = StackNavigationProp<RootStackParamList, 'VisualizaTarefa'>;
 type VisualizaTarefaRouteProp = RouteProp<RootStackParamList, 'VisualizaTarefa'>;
@@ -57,8 +58,11 @@ const RECORRENCIA_LABELS = {
 const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) => {
   const [tarefa, setTarefa] = useState<TarefaCompleta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingComentarios, setLoadingComentarios] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   const [permissoesModalVisible, setPermissoesModalVisible] = useState(false);
+  const [temComentarios, setTemComentarios] = useState(false);
+  const [comentarios, setComentarios] = useState<any[]>([]);
 
   // Parâmetros da rota - pode receber id_tarefa OU titulo
   const { id_tarefa, titulo } = route.params || {};
@@ -68,10 +72,19 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
   }, []);
 
   useEffect(() => {
-    if (workspaceId) {
+    if (id_tarefa && workspaceId) {
       carregarTarefa();
     }
-  }, [workspaceId]);
+  }, [id_tarefa, workspaceId]);
+
+  // Recarregar comentários quando a tela volta ao foco
+  useFocusEffect(
+    React.useCallback(() => {
+      if (tarefa && tarefa.id_tarefa) {
+        carregarComentarios(tarefa.id_tarefa);
+      }
+    }, [tarefa])
+  );
 
   const initializeWorkspace = async () => {
     try {
@@ -134,6 +147,13 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       }
 
       setTarefa(tarefaData);
+      setLoading(false);
+      
+      // Carregar comentários em segundo plano após carregar a tarefa
+      setTimeout(() => {
+        carregarComentarios(tarefaData.id_tarefa);
+      }, 100);
+      
     } catch (error: any) {
       console.error('Erro ao carregar tarefa:', error);
       Alert.alert(
@@ -146,8 +166,65 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           }
         ]
       );
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarComentarios = async (idTarefa: number) => {
+    setLoadingComentarios(true);
+    try {
+      const comentariosData = await apiCall(`/comentarios/tarefa/${idTarefa}`);
+      console.log('📝 Comentários carregados:', comentariosData);
+      if (comentariosData && comentariosData.length > 0) {
+        console.log('🔍 Primeiro comentário completo:', JSON.stringify(comentariosData[0], null, 2));
+      }
+      setComentarios(comentariosData || []);
+      setTemComentarios(comentariosData && comentariosData.length > 0);
+      return comentariosData || [];
+    } catch (error) {
+      console.error('Erro ao carregar comentários:', error);
+      setComentarios([]);
+      setTemComentarios(false);
+      return [];
+    } finally {
+      setLoadingComentarios(false);
+    }
+  };
+
+  const editarComentario = (comentario: any) => {
+    console.log('✏️ Editando comentário:', comentario);
+    navigation.navigate('EditComentario', {
+      comentario: comentario,
+      id_tarefa: tarefa?.id_tarefa || 0,
+      titulo_tarefa: tarefa?.titulo || 'Tarefa'
+    });
+  };
+
+  const adicionarComentario = () => {
+    console.log('💬 Navegando para cadastrar comentário na tarefa:', tarefa?.id_tarefa);
+    navigation.navigate('CadComentario', {
+      id_tarefa: tarefa?.id_tarefa || 0,
+      titulo: tarefa?.titulo || 'Tarefa'
+    });
+  };
+
+  const excluirComentario = async (comentario: any) => {
+    console.log('🗑️ Iniciando exclusão do comentário:', comentario.id_comentario);
+    
+    // Função callback para recarregar comentários após exclusão
+    const onDelete = (comentarioId: number) => {
+      console.log('✅ Comentário excluído com sucesso! ID:', comentarioId);
+      console.log('🔄 Recarregando lista de comentários...');
+      if (tarefa && tarefa.id_tarefa) {
+        carregarComentarios(tarefa.id_tarefa);
+      }
+    };
+
+    // Usar o componente dellComentario padronizado
+    try {
+      await confirmarDeletarComentario(comentario, onDelete);
+    } catch (error) {
+      console.error('❌ Erro na exclusão do comentário:', error);
     }
   };
 
@@ -311,7 +388,79 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         </View> */}
 
-        {/* Botões de Ação */}
+        {/* Seção de Comentários */}
+        <View style={styles.sectionComentarios}>
+          <Text style={styles.sectionTitle}>💬 Comentários</Text>
+          
+          {loadingComentarios ? (
+            <View style={styles.loadingComentarios}>
+              <Text style={styles.loadingComentariosText}>⏳ Carregando comentários...</Text>
+            </View>
+          ) : comentarios.length > 0 ? (
+            <ScrollView 
+              style={styles.comentariosScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}>
+              <View style={styles.comentariosContainer}>
+                {comentarios.map((comentario, index) => (
+                <View key={comentario.id || index} style={styles.comentarioItem}>
+                  <View style={styles.comentarioHeader}>
+                    <Text style={styles.comentarioAutor}>
+                      👤 {comentario.email || comentario.nome_usuario || 'Usuário'}
+                    </Text>
+                    <Text style={styles.comentarioData}>
+                      {comentario.data_criacao ? 
+                        new Date(comentario.data_criacao).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        }) : 
+                        'Hoje'
+                      }
+                    </Text>
+                  </View>
+                  
+                  <Text style={styles.comentarioTexto}>
+                    {comentario.descricao || comentario.conteudo || comentario.texto || comentario.comentario || comentario.mensagem || 'Comentário sem conteúdo'}
+                  </Text>
+                  
+                  <View style={styles.comentarioAcoes}>
+                    <TouchableOpacity 
+                      style={[styles.comentarioAcao, styles.comentarioAcaoEdit]}
+                      onPress={() => editarComentario(comentario)}
+                      activeOpacity={0.7}>
+                      <Text style={styles.comentarioAcaoTexto}>✏️ Editar</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.comentarioAcao, styles.comentarioAcaoDelete]}
+                      onPress={() => excluirComentario(comentario)}
+                      activeOpacity={0.7}>
+                      <Text style={styles.comentarioAcaoTexto}>🗑️ Excluir</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                ))}
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.loadingComentarios}>
+              <Text style={styles.semComentarios}>
+                Ainda não há comentários nesta tarefa.
+              </Text>
+            </View>
+          )}
+          
+          {/* Botão para adicionar novo comentário */}
+          <TouchableOpacity
+            style={styles.novoComentarioButton}
+            onPress={adicionarComentario}
+            activeOpacity={0.7}>
+            <Text style={styles.novoComentarioButtonText}>💬 Novo Comentário</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Botão de Gerenciar Permissões */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.permissaoButton}
@@ -334,6 +483,8 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           }}
         />
       )}
+
+
     </View>
   );
 };
@@ -568,6 +719,141 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  comentariosButton: {
+    backgroundColor: '#28a745',
+  },
+
+  comentariosContainer: {
+    paddingVertical: 8,
+  },
+
+  comentarioItem: {
+    backgroundColor: '#1e1e1e',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007bff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+
+  comentarioHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+
+  comentarioAutor: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  comentarioData: {
+    color: '#6c757d',
+    fontSize: 12,
+  },
+
+  comentarioTexto: {
+    color: '#e0e0e0',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  maisComentarios: {
+    color: '#6c757d',
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+
+  semComentarios: {
+    color: '#6c757d',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 16,
+  },
+
+  loadingComentarios: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingComentariosText: {
+    color: '#6c757d',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+
+  sectionComentarios: {
+    backgroundColor: '#2a2a2a',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    minHeight: 300,
+    maxHeight: 400,
+  },
+
+  comentariosScrollView: {
+    flex: 1,
+    maxHeight: 280,
+  },
+
+  comentarioAcoes: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginTop: 8,
+    gap: 12,
+  },
+
+  comentarioAcao: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#3a3a3a',
+    minWidth: 70,
+    alignItems: 'center',
+  },
+
+  comentarioAcaoEdit: {
+    backgroundColor: '#007bff',
+  },
+
+  comentarioAcaoDelete: {
+    backgroundColor: '#dc3545',
+  },
+
+  comentarioAcaoTexto: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  verMaisComentarios: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  verMaisComentariosTexto: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   permissaoButtonText: {
@@ -575,6 +861,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+
+  novoComentarioButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+
+  novoComentarioButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
 });
 
 export default VisualizaTarefa;
