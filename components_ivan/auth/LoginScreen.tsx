@@ -14,6 +14,7 @@ import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../router';
 import {login, setupActiveWorkspace} from '../../services/authService';
 import FirstTimePopup from '../popup/FirstTimePopup';
+import GoogleCalendarService from '../../services/googleCalendarService';
 
 type LoginScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -64,12 +65,23 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         // Verificar se o usuário já possui workspaces e configurar workspace ativo
         const workspaceSetup = await setupActiveWorkspace();
         
+        // Solicitar permissões do calendário após login bem-sucedido
+        const requestCalendarPermissions = async () => {
+          try {
+            await GoogleCalendarService.requestPermissionsWithUserFeedback();
+          } catch (error) {
+            console.log('Usuário optou por não conceder permissões do calendário');
+          }
+        };
+
         if (workspaceSetup.hasWorkspace) {
           // Se já tem workspaces, vai direto para a Home
           Alert.alert('Sucesso', 'Login realizado com sucesso!', [
             {
               text: 'OK',
-              onPress: () => {
+              onPress: async () => {
+                // Solicitar permissões do calendário
+                await requestCalendarPermissions();
                 navigation.navigate('Home');
               },
             },
@@ -79,7 +91,9 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
           Alert.alert('Sucesso', 'Login realizado com sucesso!', [
             {
               text: 'OK',
-              onPress: () => {
+              onPress: async () => {
+                // Solicitar permissões do calendário
+                await requestCalendarPermissions();
                 setShowFirstTimePopup(true);
               },
             },

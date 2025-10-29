@@ -18,6 +18,7 @@ import {RouteProp} from '@react-navigation/native';
 import {RootStackParamList} from '../router';
 import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getActiveWorkspaceId} from '../../services/authService';
+import GoogleCalendarService from '../../services/googleCalendarService';
 
 type EditTarefaNavigationProp = StackNavigationProp<RootStackParamList>;
 type EditTarefaRouteProp = RouteProp<RootStackParamList, 'EditTarefa'>;
@@ -231,6 +232,29 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
         'POST',
         { categorias: formData.categorias_selecionadas }
       );
+
+      // Integração com Google Calendar para atualização
+      try {
+        // Se mudou a data de fim, criar novo evento de prazo
+        if (formData.data_fim) {
+          const dataFim = new Date(formData.data_fim);
+          await GoogleCalendarService.createTaskDeadlineEvent(
+            `📝 ${formData.titulo} (Atualizada)`,
+            dataFim
+          );
+        }
+
+        // Se mudou para recorrente, criar evento de recorrência
+        if (formData.recorrente && formData.recorrencia) {
+          await GoogleCalendarService.createRecurringTaskEvent(
+            `📝 ${formData.titulo} (Atualizada)`,
+            formData.recorrencia
+          );
+        }
+      } catch (calendarError) {
+        console.log('Erro ao atualizar eventos no calendário:', calendarError);
+        // Não interromper o fluxo se houver erro no calendário
+      }
 
       Alert.alert('Sucesso', 'Tarefa atualizada com sucesso!', [
         {

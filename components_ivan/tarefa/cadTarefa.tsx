@@ -19,6 +19,7 @@ import {
 import {CriarTarefaInterface} from './tarefaMultiplaInterface';
 import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getUserEmail, getUserId, getActiveWorkspaceId} from '../../services/authService';
+import GoogleCalendarService from '../../services/googleCalendarService';
 
 // Tipo baseado na CriarTarefaInterface
 type FormData = CriarTarefaInterface;
@@ -187,6 +188,29 @@ const CadTarefa: React.FC = () => {
           'POST',
           { categorias: formData.categorias_selecionadas }
         );
+      }
+
+      // Integração com Google Calendar
+      try {
+        // Sempre criar evento de "tarefa criada"
+        await GoogleCalendarService.createTaskCreatedEvent(formData.titulo);
+
+        // Se tem data de fim, criar evento de prazo
+        if (formData.data_fim) {
+          const dataFim = new Date(formData.data_fim);
+          await GoogleCalendarService.createTaskDeadlineEvent(formData.titulo, dataFim);
+        }
+
+        // Se é recorrente, criar evento de recorrência
+        if (formData.recorrente && formData.recorrencia) {
+          await GoogleCalendarService.createRecurringTaskEvent(
+            formData.titulo,
+            formData.recorrencia
+          );
+        }
+      } catch (calendarError) {
+        console.log('Erro ao criar eventos no calendário:', calendarError);
+        // Não interromper o fluxo se houver erro no calendário
       }
 
       Alert.alert('Sucesso', 'Tarefa cadastrada com sucesso!', [
