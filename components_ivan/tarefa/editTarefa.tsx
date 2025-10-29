@@ -19,6 +19,7 @@ import {RootStackParamList} from '../router';
 import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getActiveWorkspaceId} from '../../services/authService';
 import GoogleCalendarService from '../../services/googleCalendarService';
+import AnexoService, {AnexoTarefa} from '../../services/anexoService';
 
 type EditTarefaNavigationProp = StackNavigationProp<RootStackParamList>;
 type EditTarefaRouteProp = RouteProp<RootStackParamList, 'EditTarefa'>;
@@ -86,6 +87,11 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
   const [categoriasDisponiveis, setCategoriasDisponiveis] = useState<
     CategoriaInterface[]
   >([]);
+  
+  // Estados para anexos
+  const [anexos, setAnexos] = useState<AnexoTarefa[]>([]);
+  const [loadingAnexos, setLoadingAnexos] = useState<boolean>(false);
+  const [uploadingAnexo, setUploadingAnexo] = useState<boolean>(false);
 
   // Estados para modals dos seletores
   const [modalPrioridade, setModalPrioridade] = useState<boolean>(false);
@@ -107,6 +113,13 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
       carregarCategorias();
     }
   }, [formData.id_workspace]);
+
+  // Carregar anexos quando tarefa for carregada
+  useEffect(() => {
+    if (formData.id_tarefa) {
+      carregarAnexos();
+    }
+  }, [formData.id_tarefa]);
 
   const carregarDadosTarefa = async () => {
     setLoadingTarefa(true);
@@ -180,6 +193,110 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
       console.error('Erro ao carregar categorias:', error);
       // Usar categorias mockadas em caso de erro
     }
+  };
+
+  // Função para carregar anexos da tarefa
+  const carregarAnexos = async () => {
+    setLoadingAnexos(true);
+    try {
+      const anexosList = await AnexoService.listarAnexosTarefa(formData.id_tarefa);
+      setAnexos(anexosList);
+    } catch (error) {
+      console.error('Erro ao carregar anexos:', error);
+    } finally {
+      setLoadingAnexos(false);
+    }
+  };
+
+  // Função para adicionar anexo
+  const adicionarAnexo = async (tipo: 'pdf' | 'imagem') => {
+    setUploadingAnexo(true);
+    try {
+      // Verificar se já existe anexo do mesmo tipo
+      const anexoExistente = anexos.find(anexo => anexo.tipo_arquivo === tipo);
+      if (anexoExistente) {
+        Alert.alert(
+          'Anexo já existe',
+          `Já existe um ${tipo} anexado. Deseja substituir?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Substituir',
+              onPress: () => substituirAnexo(anexoExistente.id_anexo, tipo),
+            },
+          ]
+        );
+        return;
+      }
+
+      // Selecionar arquivo
+      const arquivo = await AnexoService.selecionarArquivo(tipo);
+      if (!arquivo) {
+        return;
+      }
+
+      // Fazer upload
+      const sucesso = await AnexoService.uploadAnexo(formData.id_tarefa, arquivo, tipo);
+      if (sucesso) {
+        Alert.alert('Sucesso', `${tipo} anexado com sucesso!`);
+        await carregarAnexos(); // Recarregar lista
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar anexo:', error);
+      Alert.alert('Erro', 'Erro ao anexar arquivo. Tente novamente.');
+    } finally {
+      setUploadingAnexo(false);
+    }
+  };
+
+  // Função para substituir anexo
+  const substituirAnexo = async (idAnexo: number, tipo: 'pdf' | 'imagem') => {
+    try {
+      // Selecionar novo arquivo
+      const arquivo = await AnexoService.selecionarArquivo(tipo);
+      if (!arquivo) {
+        return;
+      }
+
+      // Atualizar anexo
+      const sucesso = await AnexoService.uploadAnexo(formData.id_tarefa, arquivo, tipo);
+      if (sucesso) {
+        // Deletar o anexo antigo
+        await AnexoService.deletarAnexo(idAnexo);
+        Alert.alert('Sucesso', `${tipo} substituído com sucesso!`);
+        await carregarAnexos(); // Recarregar lista
+      }
+    } catch (error) {
+      console.error('Erro ao substituir anexo:', error);
+      Alert.alert('Erro', 'Erro ao substituir arquivo. Tente novamente.');
+    }
+  };
+
+  // Função para remover anexo
+  const removerAnexo = async (anexo: AnexoTarefa) => {
+    Alert.alert(
+      'Remover Anexo',
+      `Deseja remover ${anexo.nome_original}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            const sucesso = await AnexoService.deletarAnexo(anexo.id_anexo);
+            if (sucesso) {
+              Alert.alert('Sucesso', 'Anexo removido com sucesso!');
+              await carregarAnexos(); // Recarregar lista
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Função para baixar anexo
+  const baixarAnexo = async (anexo: AnexoTarefa) => {
+    await AnexoService.baixarAnexo(anexo.id_anexo);
   };
 
   // Função para validar formulário
@@ -532,6 +649,81 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Seção Anexos */}
+          <View style={styles.anexosSection}>
+            <Text style={styles.anexosTitle}>📎 Anexos</Text>
+            <Text style={styles.anexosSubtitle}>
+              Máximo: 1 PDF (10MB) e 1 imagem (15MB)
+            </Text>
+
+            {/* Botões para adicionar anexos */}
+            <View style={styles.anexosButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.anexoButton, styles.anexoPdfButton]}
+                onPress={() => adicionarAnexo('pdf')}
+                disabled={uploadingAnexo || loading}>
+                <Text style={styles.anexoButtonIcon}>📄</Text>
+                <Text style={styles.anexoButtonText}>
+                  {uploadingAnexo ? 'Enviando...' : 'Anexar PDF'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.anexoButton, styles.anexoImageButton]}
+                onPress={() => adicionarAnexo('imagem')}
+                disabled={uploadingAnexo || loading}>
+                <Text style={styles.anexoButtonIcon}>🖼️</Text>
+                <Text style={styles.anexoButtonText}>
+                  {uploadingAnexo ? 'Enviando...' : 'Anexar Imagem'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista de anexos existentes */}
+            {loadingAnexos ? (
+              <View style={styles.anexosLoadingContainer}>
+                <Text style={styles.anexosLoadingText}>Carregando anexos...</Text>
+              </View>
+            ) : anexos.length > 0 ? (
+              <View style={styles.anexosListContainer}>
+                <Text style={styles.anexosListTitle}>Arquivos anexados:</Text>
+                {anexos.map((anexo) => (
+                  <View key={anexo.id_anexo} style={styles.anexoItem}>
+                    <View style={styles.anexoInfo}>
+                      <Text style={styles.anexoIcon}>
+                        {anexo.tipo_arquivo === 'pdf' ? '📄' : '🖼️'}
+                      </Text>
+                      <View style={styles.anexoDetails}>
+                        <Text style={styles.anexoNome} numberOfLines={1}>
+                          {anexo.nome_original}
+                        </Text>
+                        <Text style={styles.anexoTamanho}>
+                          {AnexoService.formatarTamanho(anexo.tamanho_arquivo)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.anexoActions}>
+                      <TouchableOpacity
+                        style={styles.anexoActionButton}
+                        onPress={() => baixarAnexo(anexo)}>
+                        <Text style={styles.anexoActionIcon}>⬇️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.anexoActionButton, styles.anexoRemoveButton]}
+                        onPress={() => removerAnexo(anexo)}>
+                        <Text style={styles.anexoActionIcon}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.anexosEmptyContainer}>
+                <Text style={styles.anexosEmptyText}>Nenhum anexo adicionado</Text>
+              </View>
+            )}
+          </View>
 
           {/* Botão Atualizar */}
           <TouchableOpacity
@@ -991,6 +1183,132 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+
+  // Estilos para anexos
+  anexosSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 20,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: '#404040',
+  },
+  anexosTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  anexosSubtitle: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 16,
+  },
+  anexosButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  anexoButton: {
+    flex: 1,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    borderWidth: 1,
+  },
+  anexoPdfButton: {
+    backgroundColor: '#dc3545',
+    borderColor: '#dc3545',
+  },
+  anexoImageButton: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
+  },
+  anexoButtonIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  anexoButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  anexosLoadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  anexosLoadingText: {
+    color: '#6c757d',
+    fontSize: 14,
+  },
+  anexosListContainer: {
+    marginTop: 8,
+  },
+  anexosListTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  anexoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#404040',
+  },
+  anexoInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  anexoIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  anexoDetails: {
+    flex: 1,
+  },
+  anexoNome: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  anexoTamanho: {
+    color: '#6c757d',
+    fontSize: 12,
+  },
+  anexoActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  anexoActionButton: {
+    backgroundColor: '#404040',
+    borderRadius: 6,
+    padding: 8,
+    marginLeft: 6,
+  },
+  anexoRemoveButton: {
+    backgroundColor: '#dc3545',
+  },
+  anexoActionIcon: {
+    fontSize: 16,
+  },
+  anexosEmptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  anexosEmptyText: {
+    color: '#6c757d',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });
 

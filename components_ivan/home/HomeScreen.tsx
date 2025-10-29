@@ -17,6 +17,7 @@ import CardFavoritos from '../cards/cardFavoritos';
 import CardCalendario from '../cards/cardCalendario';
 import { getActiveWorkspaceId } from '../../services/authService';
 import CardMembros from '../cards/cardMembros';
+import CardDashboardSmall from '../cards/cardDashboardSmall';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -80,13 +81,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header Superior com Cards */}
       <View style={[styles.topHeader, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.workspaceCard}>
+        <View style={styles.cardItem}>
           <CardWorkspace navigation={navigation} />
         </View>
-        <View style={styles.membrosCard}>
+        <View style={styles.cardItem}>
           <CardMembros refreshKey={workspaceRefreshKey} />
         </View>
-        <CardUser navigation={navigation} />
+        <View style={styles.cardItem}>
+          <CardDashboardSmall navigation={navigation} refreshKey={workspaceRefreshKey} />
+        </View>
+        <View style={styles.cardItem}>
+          <CardUser navigation={navigation} />
+        </View>
       </View>
 
       {/* Espaço Central Livre */}
@@ -204,19 +210,17 @@ const styles = StyleSheet.create({
   
   topHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     minHeight: 80,
   },
 
-  workspaceCard: {
-    marginRight: -60, // Aproxima mais do centro
-  },
-
-  membrosCard: {
-    marginLeft: -110, // Aproxima muito mais do card de workspace
+  cardItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
   dateHeader: {

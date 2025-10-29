@@ -15,6 +15,7 @@ import { apiCall, getActiveWorkspaceId } from '../../services/authService';
 import TarefaMultiplaInterface from './tarefaMultiplaInterface';
 import GerenciarPermissoesModal from '../permissoes/GerenciarPermissoesModal';
 import { confirmarDeletarComentario } from '../comentario/dellComentario';
+import AnexoService, {AnexoTarefa} from '../../services/anexoService';
 
 type VisualizaTarefaNavigationProp = StackNavigationProp<RootStackParamList, 'VisualizaTarefa'>;
 type VisualizaTarefaRouteProp = RouteProp<RootStackParamList, 'VisualizaTarefa'>;
@@ -63,6 +64,10 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
   const [permissoesModalVisible, setPermissoesModalVisible] = useState(false);
   const [temComentarios, setTemComentarios] = useState(false);
   const [comentarios, setComentarios] = useState<any[]>([]);
+  
+  // Estados para anexos
+  const [anexos, setAnexos] = useState<AnexoTarefa[]>([]);
+  const [loadingAnexos, setLoadingAnexos] = useState(false);
 
   // Parâmetros da rota - pode receber id_tarefa OU titulo
   const { id_tarefa, titulo } = route.params || {};
@@ -149,9 +154,10 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       setTarefa(tarefaData);
       setLoading(false);
       
-      // Carregar comentários em segundo plano após carregar a tarefa
+      // Carregar comentários e anexos em segundo plano após carregar a tarefa
       setTimeout(() => {
         carregarComentarios(tarefaData.id_tarefa);
+        carregarAnexos(tarefaData.id_tarefa);
       }, 100);
       
     } catch (error: any) {
@@ -189,6 +195,23 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     } finally {
       setLoadingComentarios(false);
     }
+  };
+
+  const carregarAnexos = async (idTarefa: number) => {
+    setLoadingAnexos(true);
+    try {
+      const anexosData = await AnexoService.listarAnexosTarefa(idTarefa);
+      setAnexos(anexosData);
+    } catch (error) {
+      console.error('Erro ao carregar anexos:', error);
+      setAnexos([]);
+    } finally {
+      setLoadingAnexos(false);
+    }
+  };
+
+  const baixarAnexo = async (anexo: AnexoTarefa) => {
+    await AnexoService.baixarAnexo(anexo.id_anexo);
   };
 
   const editarComentario = (comentario: any) => {
@@ -387,6 +410,52 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
             <Text style={styles.infoValue}>{tarefa.id_workspace}</Text>
           </View>
         </View> */}
+
+        {/* Seção de Anexos */}
+        <View style={styles.sectionAnexos}>
+          <Text style={styles.sectionTitle}>📎 Anexos</Text>
+
+          {loadingAnexos ? (
+            <View style={styles.loadingAnexos}>
+              <Text style={styles.loadingAnexosText}>⏳ Carregando anexos...</Text>
+            </View>
+          ) : anexos.length > 0 ? (
+            <View style={styles.anexosListContainer}>
+              {anexos.map((anexo) => (
+                <View key={anexo.id_anexo} style={styles.anexoItemVisualizacao}>
+                  <View style={styles.anexoInfoVisualizacao}>
+                    <Text style={styles.anexoIconVisualizacao}>
+                      {anexo.tipo_arquivo === 'pdf' ? '📄' : '🖼️'}
+                    </Text>
+                    <View style={styles.anexoDetailsVisualizacao}>
+                      <Text style={styles.anexoNomeVisualizacao} numberOfLines={1}>
+                        {anexo.nome_original}
+                      </Text>
+                      <Text style={styles.anexoTamanhoVisualizacao}>
+                        {AnexoService.formatarTamanho(anexo.tamanho_arquivo)}
+                      </Text>
+                      <Text style={styles.anexoDataVisualizacao}>
+                        Anexado em: {new Date(anexo.data_upload).toLocaleDateString('pt-BR')}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.anexoDownloadButton}
+                    onPress={() => baixarAnexo(anexo)}>
+                    <Text style={styles.anexoDownloadIcon}>⬇️</Text>
+                    <Text style={styles.anexoDownloadText}>Baixar</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.semAnexos}>
+              <Text style={styles.semAnexosText}>
+                Nenhum anexo foi adicionado a esta tarefa.
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Seção de Comentários */}
         <View style={styles.sectionComentarios}>
@@ -875,6 +944,109 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // Estilos para seção de anexos
+  sectionAnexos: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
+
+  loadingAnexos: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+
+  loadingAnexosText: {
+    color: '#888',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+
+  anexosListContainer: {
+    marginTop: 8,
+  },
+
+  anexoItemVisualizacao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+
+  anexoInfoVisualizacao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+
+  anexoIconVisualizacao: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+
+  anexoDetailsVisualizacao: {
+    flex: 1,
+  },
+
+  anexoNomeVisualizacao: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+
+  anexoTamanhoVisualizacao: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 2,
+  },
+
+  anexoDataVisualizacao: {
+    color: '#888',
+    fontSize: 11,
+  },
+
+  anexoDownloadButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    minWidth: 70,
+  },
+
+  anexoDownloadIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+
+  anexoDownloadText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  semAnexos: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+
+  semAnexosText: {
+    color: '#888',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 
 });

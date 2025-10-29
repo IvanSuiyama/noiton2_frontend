@@ -15,6 +15,7 @@ import {RootStackParamList} from '../router';
 import {login, setupActiveWorkspace} from '../../services/authService';
 import FirstTimePopup from '../popup/FirstTimePopup';
 import GoogleCalendarService from '../../services/googleCalendarService';
+import AnexoService from '../../services/anexoService';
 
 type LoginScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -65,12 +66,18 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         // Verificar se o usuário já possui workspaces e configurar workspace ativo
         const workspaceSetup = await setupActiveWorkspace();
         
-        // Solicitar permissões do calendário após login bem-sucedido
-        const requestCalendarPermissions = async () => {
+        // Solicitar permissões após login bem-sucedido
+        const requestAllPermissions = async () => {
           try {
+            // Solicitar permissões do calendário
             await GoogleCalendarService.requestPermissionsWithUserFeedback();
+            
+            // Aguardar um pouco antes de solicitar permissões de arquivo
+            setTimeout(async () => {
+              await AnexoService.requestPermissionsWithUserFeedback();
+            }, 1000);
           } catch (error) {
-            console.log('Usuário optou por não conceder permissões do calendário');
+            console.log('Usuário optou por não conceder algumas permissões');
           }
         };
 
@@ -80,8 +87,8 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             {
               text: 'OK',
               onPress: async () => {
-                // Solicitar permissões do calendário
-                await requestCalendarPermissions();
+                // Solicitar permissões
+                await requestAllPermissions();
                 navigation.navigate('Home');
               },
             },
@@ -92,8 +99,8 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             {
               text: 'OK',
               onPress: async () => {
-                // Solicitar permissões do calendário
-                await requestCalendarPermissions();
+                // Solicitar permissões
+                await requestAllPermissions();
                 setShowFirstTimePopup(true);
               },
             },
