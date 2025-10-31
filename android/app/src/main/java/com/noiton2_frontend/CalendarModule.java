@@ -51,7 +51,10 @@ public class CalendarModule extends ReactContextBaseJavaModule {
             
             long calendarId = -1;
             if (cursor != null && cursor.moveToFirst()) {
-                calendarId = cursor.getLong(cursor.getColumnIndex(CalendarContract.Calendars._ID));
+                int columnIndex = cursor.getColumnIndex(CalendarContract.Calendars._ID);
+                if (columnIndex >= 0) {
+                    calendarId = cursor.getLong(columnIndex);
+                }
                 cursor.close();
             }
             
