@@ -33,7 +33,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState<number | null>(null);
 
-  // Sempre que a tela for exibida, pega o workspace ativo
   useEffect(() => {
     const fetchWorkspaceId = async () => {
       const id = await getActiveWorkspaceId();
@@ -42,7 +41,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     fetchWorkspaceId();
   }, []);
 
-  // Se workspace mudar (por navegação, troca, etc), atualiza a chave
   useEffect(() => {
     const interval = setInterval(async () => {
       const id = await getActiveWorkspaceId();
@@ -79,112 +77,112 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header Superior com Cards */}
+      {}
       <View style={[styles.topHeader, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.cardItem}>
+        <View style={styles.cardWrapper}>
           <CardWorkspace navigation={navigation} />
         </View>
-        <View style={styles.cardItem}>
+        <View style={styles.cardWrapper}>
           <CardMembros refreshKey={workspaceRefreshKey} />
         </View>
-        <View style={styles.cardItem}>
+        <View style={styles.cardWrapper}>
           <CardDashboardSmall navigation={navigation} refreshKey={workspaceRefreshKey} />
         </View>
-        <View style={styles.cardItem}>
+        <View style={styles.cardWrapper}>
           <CardUser navigation={navigation} />
         </View>
       </View>
 
-      {/* Espaço Central Livre */}
+      {}
       <View style={styles.centerSpace} />
 
-      {/* Menu de Navegação */}
-      <View style={[styles.tabsContainer, { 
+      {}
+      <View style={[styles.tabsContainer, {
         backgroundColor: theme.colors.surface,
-        borderBottomColor: theme.colors.border 
+        borderBottomColor: theme.colors.border
       }]}>
         <TouchableOpacity
           style={[
-            styles.tab, 
-            activeTab === 'home' && { 
-              ...styles.activeTab, 
+            styles.tab,
+            activeTab === 'home' && {
+              ...styles.activeTab,
               backgroundColor: `${theme.colors.primary}20`,
-              borderBottomColor: theme.colors.primary 
+              borderBottomColor: theme.colors.primary
             }
           ]}
           onPress={() => setActiveTab('home')}>
           <Text style={[
-            styles.tabText, 
+            styles.tabText,
             { color: theme.colors.textSecondary },
-            activeTab === 'home' && { 
-              ...styles.activeTabText, 
-              color: theme.colors.text 
+            activeTab === 'home' && {
+              ...styles.activeTabText,
+              color: theme.colors.text
             }
           ]}>
             🏠 Home
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
-            styles.tab, 
-            activeTab === 'tarefas' && { 
-              ...styles.activeTab, 
+            styles.tab,
+            activeTab === 'tarefas' && {
+              ...styles.activeTab,
               backgroundColor: `${theme.colors.primary}20`,
-              borderBottomColor: theme.colors.primary 
+              borderBottomColor: theme.colors.primary
             }
           ]}
           onPress={() => setActiveTab('tarefas')}>
           <Text style={[
-            styles.tabText, 
+            styles.tabText,
             { color: theme.colors.textSecondary },
-            activeTab === 'tarefas' && { 
-              ...styles.activeTabText, 
-              color: theme.colors.text 
+            activeTab === 'tarefas' && {
+              ...styles.activeTabText,
+              color: theme.colors.text
             }
           ]}>
             📝 Tarefas
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
-            styles.tab, 
-            activeTab === 'favoritos' && { 
-              ...styles.activeTab, 
+            styles.tab,
+            activeTab === 'favoritos' && {
+              ...styles.activeTab,
               backgroundColor: `${theme.colors.primary}20`,
-              borderBottomColor: theme.colors.primary 
+              borderBottomColor: theme.colors.primary
             }
           ]}
           onPress={() => setActiveTab('favoritos')}>
           <Text style={[
-            styles.tabText, 
+            styles.tabText,
             { color: theme.colors.textSecondary },
-            activeTab === 'favoritos' && { 
-              ...styles.activeTabText, 
-              color: theme.colors.text 
+            activeTab === 'favoritos' && {
+              ...styles.activeTabText,
+              color: theme.colors.text
             }
           ]}>
             ⭐ Favoritos
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
-            styles.tab, 
-            activeTab === 'calendario' && { 
-              ...styles.activeTab, 
+            styles.tab,
+            activeTab === 'calendario' && {
+              ...styles.activeTab,
               backgroundColor: `${theme.colors.primary}20`,
-              borderBottomColor: theme.colors.primary 
+              borderBottomColor: theme.colors.primary
             }
           ]}
           onPress={() => setActiveTab('calendario')}>
           <Text style={[
-            styles.tabText, 
+            styles.tabText,
             { color: theme.colors.textSecondary },
-            activeTab === 'calendario' && { 
-              ...styles.activeTabText, 
-              color: theme.colors.text 
+            activeTab === 'calendario' && {
+              ...styles.activeTabText,
+              color: theme.colors.text
             }
           ]}>
             📅 Calendário
@@ -192,7 +190,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Conteúdo Principal */}
+      {}
       <View style={[styles.mainContent, { backgroundColor: theme.colors.background }]}>
         <View style={styles.cardContainer}>
           {renderTabContent()}
@@ -207,28 +205,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  
+
   topHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     minHeight: 80,
   },
 
-  cardItem: {
+  cardWrapper: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   dateHeader: {
     paddingHorizontal: 16,
     paddingVertical: 20,
     alignItems: 'center',
   },
-  
+
   dateText: {
     fontSize: 18,
     fontWeight: '600',
@@ -259,7 +257,7 @@ const styles = StyleSheet.create({
   },
 
   activeTab: {
-    // Estilos dinâmicos aplicados inline
+
   },
 
   tabText: {
@@ -270,7 +268,7 @@ const styles = StyleSheet.create({
   activeTabText: {
     fontWeight: '600',
   },
-  
+
   mainContent: {
     flex: 1,
   },
@@ -279,7 +277,7 @@ const styles = StyleSheet.create({
     padding: 16,
     flex: 1,
   },
-  
+
   bottomSpacing: {
     height: 30,
   },

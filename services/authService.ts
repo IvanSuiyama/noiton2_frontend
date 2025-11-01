@@ -90,9 +90,13 @@ export const apiCall = async (
   }
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   };
+
+  // Para FormData, não definir Content-Type (deixar o fetch definir automaticamente)
+  if (!(body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   // Incluir workspace ID no header se necessário
   if (includeWorkspace) {
@@ -108,7 +112,11 @@ export const apiCall = async (
   };
 
   if (body) {
-    config.body = JSON.stringify(body);
+    if (body instanceof FormData) {
+      config.body = body; // FormData vai como está
+    } else {
+      config.body = JSON.stringify(body); // JSON normal
+    }
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, config);

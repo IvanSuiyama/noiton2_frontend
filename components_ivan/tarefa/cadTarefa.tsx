@@ -19,7 +19,7 @@ import {
 import {CriarTarefaInterface} from './tarefaMultiplaInterface';
 import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getUserEmail, getUserId, getActiveWorkspaceId} from '../../services/authService';
-import GoogleCalendarService from '../../services/googleCalendarService';
+import CalendarSyncService from '../../services/calendarSyncService';
 
 // Tipo baseado na CriarTarefaInterface
 type FormData = CriarTarefaInterface;
@@ -192,24 +192,14 @@ const CadTarefa: React.FC = () => {
 
       // Integração com Google Calendar
       try {
-        // Sempre criar evento de "tarefa criada"
-        await GoogleCalendarService.createTaskCreatedEvent(formData.titulo);
-
-        // Se tem data de fim, criar evento de prazo
-        if (formData.data_fim) {
-          const dataFim = new Date(formData.data_fim);
-          await GoogleCalendarService.createTaskDeadlineEvent(formData.titulo, dataFim);
-        }
-
-        // Se é recorrente, criar evento de recorrência
-        if (formData.recorrente && formData.recorrencia) {
-          await GoogleCalendarService.createRecurringTaskEvent(
-            formData.titulo,
-            formData.recorrencia
-          );
-        }
+        await CalendarSyncService.syncSingleTask({
+          id: tarefaCriada.id_tarefa,
+          titulo: formData.titulo,
+          descricao: formData.descricao,
+          data_fim: formData.data_fim
+        });
       } catch (calendarError) {
-        console.log('Erro ao criar eventos no calendário:', calendarError);
+        console.log('Erro ao registrar tarefa no calendário:', calendarError);
         // Não interromper o fluxo se houver erro no calendário
       }
 

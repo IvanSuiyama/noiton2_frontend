@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { apiCall } from '../../services/authService';
 
 interface Usuario {
   id_usuario: number;
@@ -37,7 +38,7 @@ interface GerenciarPermissoesModalProps {
 
 const nivelLabels = {
   0: 'Criador',
-  1: 'Editor', 
+  1: 'Editor',
   2: 'Visualizador'
 };
 
@@ -72,23 +73,20 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
   const carregarPermissoes = async () => {
     try {
       setLoading(true);
-      // Simulando dados para teste
-      const mockData: PermissaoCompleta = {
+
+      const usuariosWorkspace = await apiCall(`/workspaces/${idWorkspace}/usuarios`, 'GET');
+
+      const permissoesData: PermissaoCompleta = {
         id_tarefa: idTarefa,
-        permissoes_atuais: [
-          { id_usuario: 1, email: 'admin@teste.com', nome: 'Admin', nivel_acesso: 0 },
-          { id_usuario: 2, email: 'editor@teste.com', nome: 'Editor', nivel_acesso: 1 },
-        ],
-        usuarios_disponiveis: [
-          { id_usuario: 3, email: 'user1@teste.com', nome: 'Usuário 1' },
-          { id_usuario: 4, email: 'user2@teste.com', nome: 'Usuário 2' },
-        ],
+        permissoes_atuais: [],
+        usuarios_disponiveis: usuariosWorkspace || [],
         pode_gerenciar: true
       };
-      setPermissoes(mockData);
+
+      setPermissoes(permissoesData);
     } catch (error) {
-      console.error('Erro ao carregar permissões:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as permissões');
+      console.error('Erro ao carregar usuários do workspace:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os usuários do workspace');
     } finally {
       setLoading(false);
     }
@@ -148,7 +146,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
           {nivelLabels[item.nivel_acesso!]} - {nivelDescricoes[item.nivel_acesso!]}
         </Text>
       </View>
-      
+
       <View style={styles.usuarioAcoes}>
         {item.nivel_acesso !== 0 ? (
           <>
@@ -162,7 +160,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
                 {item.nivel_acesso === 1 ? 'Para Visualizador' : 'Para Editor'}
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={styles.botaoRemover}
               onPress={() => removerPermissao(item)}>
@@ -191,7 +189,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
 
   return (
     <>
-      {/* Modal de Seleção de Usuário */}
+      {}
       <Modal visible={showUsuarioSelector} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.selectorModal, { backgroundColor: theme.colors.surface }]}>
@@ -222,7 +220,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
         </View>
       </Modal>
 
-      {/* Modal de Seleção de Nível */}
+      {}
       <Modal visible={showNivelSelector} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.selectorModal}>
@@ -240,7 +238,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
                 <Text style={styles.selectorItemText}>Editor</Text>
                 <Text style={styles.selectorItemEmail}>Pode ver e editar</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[
                   styles.selectorItem,
@@ -263,7 +261,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
         </View>
       </Modal>
 
-      {/* Modal Principal */}
+      {}
       <Modal visible={visible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
@@ -272,23 +270,11 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
               <Text style={[styles.subtitulo, { color: theme.colors.textSecondary }]}>{tituloTarefa}</Text>
             </View>
 
-            {/* Lista de usuários com permissão */}
-            <View style={styles.secao}>
-              <Text style={[styles.secaoTitulo, { color: theme.colors.text }]}>Usuários com Acesso ({permissoes?.permissoes_atuais.length || 0})</Text>
-              <FlatList
-                data={permissoes?.permissoes_atuais || []}
-                keyExtractor={(item) => item.id_usuario.toString()}
-                renderItem={renderUsuarioPermissao}
-                style={styles.lista}
-                showsVerticalScrollIndicator={false}
-              />
-            </View>
-
-            {/* Adicionar novo usuário */}
+            {}
             {permissoes?.usuarios_disponiveis && permissoes.usuarios_disponiveis.length > 0 && (
               <View style={styles.secao}>
                 <Text style={styles.secaoTitulo}>Adicionar Usuário</Text>
-                
+
                 <View style={styles.adicionarContainer}>
                   <View style={styles.selectorContainer}>
                     <Text style={styles.selectorLabel}>Usuário:</Text>
@@ -296,7 +282,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
                       style={styles.selectorButton}
                       onPress={() => setShowUsuarioSelector(true)}>
                       <Text style={styles.selectorText}>
-                        {usuarioSelecionado 
+                        {usuarioSelecionado
                           ? `${usuarioSelecionado.nome} (${usuarioSelecionado.email})`
                           : 'Selecione um usuário...'
                         }
@@ -311,7 +297,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
                       style={styles.selectorButton}
                       onPress={() => setShowNivelSelector(true)}>
                       <Text style={styles.selectorText}>
-                        {nivelSelecionado === 1 
+                        {nivelSelecionado === 1
                           ? 'Editor - Pode ver e editar'
                           : 'Visualizador - Pode apenas ver'
                         }
@@ -330,7 +316,7 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
               </View>
             )}
 
-            {/* Botões de ação */}
+            {}
             <View style={styles.botoesAcao}>
               <TouchableOpacity style={styles.botaoCancelar} onPress={onClose}>
                 <Text style={styles.textoBotaoCancelar}>Fechar</Text>
@@ -512,7 +498,7 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  // Estilos dos modais de seleção
+
   selectorModal: {
     backgroundColor: '#fff',
     borderRadius: 12,

@@ -18,7 +18,7 @@ import {RouteProp} from '@react-navigation/native';
 import {RootStackParamList} from '../router';
 import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getActiveWorkspaceId} from '../../services/authService';
-import GoogleCalendarService from '../../services/googleCalendarService';
+import CalendarSyncService from '../../services/calendarSyncService';
 import AnexoService, {AnexoTarefa} from '../../services/anexoService';
 
 type EditTarefaNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -197,12 +197,25 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
 
   // Função para carregar anexos da tarefa
   const carregarAnexos = async () => {
+    console.log('🔄 Carregando anexos para tarefa:', formData.id_tarefa);
+    
+    if (!formData.id_tarefa) {
+      console.log('⚠️ ID da tarefa não está definido');
+      return;
+    }
+    
     setLoadingAnexos(true);
     try {
-      const anexosList = await AnexoService.listarAnexosTarefa(formData.id_tarefa);
+      const anexosList = await AnexoService.listarAnexos(formData.id_tarefa);
+      
+      console.log('📎 Resultado do service:', anexosList);
+      console.log('📎 Tipo do resultado:', typeof anexosList);
+      console.log('📎 É array:', Array.isArray(anexosList));
+      console.log('📎 Quantidade de anexos:', anexosList?.length || 0);
+      
       setAnexos(anexosList);
     } catch (error) {
-      console.error('Erro ao carregar anexos:', error);
+      console.error('❌ Erro ao carregar anexos:', error);
     } finally {
       setLoadingAnexos(false);
     }
@@ -226,20 +239,24 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
             },
           ]
         );
+        setUploadingAnexo(false);
         return;
       }
 
       // Selecionar arquivo
       const arquivo = await AnexoService.selecionarArquivo(tipo);
       if (!arquivo) {
+        setUploadingAnexo(false);
         return;
       }
 
       // Fazer upload
       const sucesso = await AnexoService.uploadAnexo(formData.id_tarefa, arquivo, tipo);
       if (sucesso) {
+        console.log('✅ Upload bem-sucedido, recarregando anexos...');
         Alert.alert('Sucesso', `${tipo} anexado com sucesso!`);
         await carregarAnexos(); // Recarregar lista
+        console.log('🔄 Anexos recarregados após upload');
       }
     } catch (error) {
       console.error('Erro ao adicionar anexo:', error);
@@ -251,10 +268,12 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
 
   // Função para substituir anexo
   const substituirAnexo = async (idAnexo: number, tipo: 'pdf' | 'imagem') => {
+    setUploadingAnexo(true);
     try {
       // Selecionar novo arquivo
       const arquivo = await AnexoService.selecionarArquivo(tipo);
       if (!arquivo) {
+        setUploadingAnexo(false);
         return;
       }
 
@@ -263,12 +282,16 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
       if (sucesso) {
         // Deletar o anexo antigo
         await AnexoService.deletarAnexo(idAnexo);
+        console.log('✅ Substituição bem-sucedida, recarregando anexos...');
         Alert.alert('Sucesso', `${tipo} substituído com sucesso!`);
         await carregarAnexos(); // Recarregar lista
+        console.log('🔄 Anexos recarregados após substituição');
       }
     } catch (error) {
       console.error('Erro ao substituir anexo:', error);
       Alert.alert('Erro', 'Erro ao substituir arquivo. Tente novamente.');
+    } finally {
+      setUploadingAnexo(false);
     }
   };
 
@@ -352,19 +375,30 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
 
       // Integração com Google Calendar para atualização
       try {
-        // Se mudou a data de fim, criar novo evento de prazo
-        if (formData.data_fim) {
-          const dataFim = new Date(formData.data_fim);
-          await GoogleCalendarService.createTaskDeadlineEvent(
-            `📝 ${formData.titulo} (Atualizada)`,
-            dataFim
-          );
+        // Se a tarefa foi concluída, registrar conclusão
+        if (formData.status === 'concluido' && tarefaOriginal?.status !== 'concluido') {
+          await CalendarSyncService.completeSingleTask({
+            id: formData.id_tarefa,
+            titulo: formData.titulo,
+            descricao: formData.descricao
+          });
+        } else {
+          // Se foi apenas editada, registrar edição
+          await CalendarSyncService.updateSingleTask({
+            id: formData.id_tarefa,
+            titulo: formData.titulo,
+            descricao: formData.descricao,
+            data_fim: formData.data_fim
+          });
         }
 
+
+
         // Se mudou para recorrente, criar evento de recorrência
-        if (formData.recorrente && formData.recorrencia) {
-          await GoogleCalendarService.createRecurringTaskEvent(
-            `📝 ${formData.titulo} (Atualizada)`,
+        if (formData.recorrente && formData.recorrencia && 
+            (!tarefaOriginal?.recorrente || formData.recorrencia !== tarefaOriginal?.recorrencia)) {
+          console.log('Recorrência atualizada:', // Método removido
+            `� ${formData.titulo} (Recorrência Atualizada)`,
             formData.recorrencia
           );
         }

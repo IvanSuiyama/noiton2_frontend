@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Alert, 
-  FlatList, 
-  Modal 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  FlatList,
+  Modal
 } from 'react-native';
 import {
   apiCall,
@@ -17,14 +17,10 @@ import {
 import WorkspaceInterface from '../workspace/workspaceInterface';
 import { useTheme } from '../theme/ThemeContext';
 
-
-// Não recebe mais props de membros, criador, isEquipe
 interface CardMembrosProps {
   onMembrosAtualizados?: (novosMembros: string[]) => void;
   refreshKey?: any;
 }
-
-
 
 const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refreshKey }) => {
   const { theme } = useTheme();
@@ -38,7 +34,6 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
   const [workspaces, setWorkspaces] = useState<WorkspaceInterface[]>([]);
   const [activeWorkspace, setActiveWorkspaceState] = useState<WorkspaceInterface | null>(null);
 
-  // Função agora é exportada para uso em outras funções
   const initializeWorkspaceData = async () => {
     try {
       const userWorkspaces = await getUserWorkspaces();
@@ -74,14 +69,12 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
     initializeWorkspaceData();
   }, []);
 
-  // Atualiza membros sempre que o workspace ativo mudar
   useEffect(() => {
     if (idWorkspace) {
       initializeWorkspaceData();
     }
   }, [idWorkspace]);
 
-  // Adiciona efeito para atualizar ao mudar refreshKey
   useEffect(() => {
     initializeWorkspaceData();
   }, [refreshKey]);
@@ -153,11 +146,9 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
     </View>
   );
 
-
-  // Card pequeno (apenas ícone - igual ao CardUser)
   const renderCardPequeno = () => (
-    <TouchableOpacity 
-      style={[styles.cardPequeno, { backgroundColor: theme.colors.surface }]} 
+    <TouchableOpacity
+      style={[styles.cardPequeno, { backgroundColor: theme.colors.surface }]}
       onPress={() => setModalVisible(true)}
     >
       <View style={[styles.cardIcon, { backgroundColor: theme.colors.background }]}>
@@ -166,7 +157,6 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
     </TouchableOpacity>
   );
 
-  // Modal com funcionalidades completas
   const renderModal = () => (
     <Modal
       visible={modalVisible}
@@ -176,10 +166,10 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
     >
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
-          {/* Header do Modal */}
+          {}
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Gerenciar Membros</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setModalVisible(false)}
               style={styles.modalCloseButton}
             >
@@ -187,7 +177,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
             </TouchableOpacity>
           </View>
 
-          {/* Lista de Membros */}
+          {}
           <FlatList
             data={listaMembros}
             keyExtractor={item => item}
@@ -200,7 +190,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
             }
           />
 
-          {/* Adicionar Membro (apenas se for equipe) */}
+          {}
           {isEquipe && (
             <View style={styles.addContainer}>
               <TextInput
@@ -213,9 +203,9 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
                 keyboardType="email-address"
                 editable={!loading}
               />
-              <TouchableOpacity 
-                style={styles.addBtn} 
-                onPress={adicionarMembro} 
+              <TouchableOpacity
+                style={styles.addBtn}
+                onPress={adicionarMembro}
                 disabled={loading}
               >
                 <Text style={{ fontSize: 18, color: '#fff' }}>➕</Text>
@@ -236,7 +226,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
 };
 
 const styles = StyleSheet.create({
-  // Card Pequeno (igual ao CardUser)
+
   cardPequeno: {
     width: 60,
     height: 60,
@@ -256,9 +246,9 @@ const styles = StyleSheet.create({
   },
   cardIconText: {
     fontSize: 20,
+    fontWeight: 'bold',
   },
 
-  // Modal (mantido igual)
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',

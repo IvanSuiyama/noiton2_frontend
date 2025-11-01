@@ -35,7 +35,6 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   const [errors, setErrors] = useState<{email?: string; senha?: string}>({});
   const [showFirstTimePopup, setShowFirstTimePopup] = useState<boolean>(false);
 
-  // Função para validar formulário
   const validarFormulario = (): boolean => {
     const newErrors: {email?: string; senha?: string} = {};
 
@@ -63,49 +62,96 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
       const resultado = await login(formData.email, formData.senha);
 
       if (resultado.sucesso) {
-        // Verificar se o usuário já possui workspaces e configurar workspace ativo
+
         const workspaceSetup = await setupActiveWorkspace();
-        
-        // Solicitar permissões após login bem-sucedido
+
         const requestAllPermissions = async () => {
           try {
-            // Solicitar permissões do calendário
-            await GoogleCalendarService.requestPermissionsWithUserFeedback();
-            
-            // Aguardar um pouco antes de solicitar permissões de arquivo
-            setTimeout(async () => {
-              await AnexoService.requestPermissionsWithUserFeedback();
-            }, 1000);
+
+            console.log('📅 Configurando integração com Google Calendar...');
+            try {
+
+              const hasPermissions = await GoogleCalendarService.hasCalendarPermissions();
+
+              if (!hasPermissions) {
+
+                Alert.alert(
+                  '📅 Integração com Google Calendar',
+                  'Para uma melhor experiência, o app pode sincronizar suas tarefas com o Google Calendar e enviar lembretes de prazos.\n\nDeseja ativar esta funcionalidade?',
+                  [
+                    {
+                      text: 'Agora não',
+                      onPress: async () => {
+                        console.log('ℹ️ Usuário optou por não usar integração com Google Calendar');
+                        await GoogleCalendarService.initializeAfterLogin();
+                      },
+                      style: 'cancel',
+                    },
+                    {
+                      text: 'Ativar',
+                      onPress: async () => {
+                        const granted = await GoogleCalendarService.requestCalendarPermissions();
+                        if (granted) {
+                          console.log('✅ Permissões do Google Calendar concedidas - sincronização automática ativada');
+
+                          await GoogleCalendarService.initializeAfterLogin();
+
+                          Alert.alert(
+                            '✅ Google Calendar',
+                            'Integração ativada com sucesso!\n\n• Tarefas serão sincronizadas automaticamente\n• Você receberá lembretes de prazos\n• Verificação automática a cada 4 horas',
+                            [{ text: 'Perfeito!', style: 'default' }]
+                          );
+                        } else {
+                          Alert.alert(
+                            'ℹ️ Permissões',
+                            'Sem as permissões, não será possível sincronizar com o Google Calendar. Você pode ativar isso depois nas configurações.',
+                            [{ text: 'OK', style: 'default' }]
+                          );
+                          await GoogleCalendarService.initializeAfterLogin();
+                        }
+                      },
+                    },
+                  ]
+                );
+              } else {
+                console.log('✅ Permissões do Google Calendar já concedidas');
+                await GoogleCalendarService.initializeAfterLogin();
+              }
+            } catch (calendarError) {
+              console.log('⚠️ Erro ao configurar calendário:', calendarError);
+
+              await GoogleCalendarService.initializeAfterLogin();
+            }
+
+            const hasFilePermissions = await AnexoService.checkPermissions();
+
+            if (!hasFilePermissions) {
+              setTimeout(async () => {
+                await AnexoService.requestPermissionsWithUserFeedback();
+              }, 1500);
+            }
           } catch (error) {
             console.log('Usuário optou por não conceder algumas permissões');
           }
         };
 
-        if (workspaceSetup.hasWorkspace) {
-          // Se já tem workspaces, vai direto para a Home
-          Alert.alert('Sucesso', 'Login realizado com sucesso!', [
-            {
-              text: 'OK',
-              onPress: async () => {
-                // Solicitar permissões
-                await requestAllPermissions();
+        Alert.alert('Sucesso', 'Login realizado com sucesso!', [
+          {
+            text: 'OK',
+            onPress: async () => {
+
+              await requestAllPermissions();
+
+              if (workspaceSetup.hasWorkspace) {
+
                 navigation.navigate('Home');
-              },
-            },
-          ]);
-        } else {
-          // Se não tem workspaces, mostra o popup
-          Alert.alert('Sucesso', 'Login realizado com sucesso!', [
-            {
-              text: 'OK',
-              onPress: async () => {
-                // Solicitar permissões
-                await requestAllPermissions();
+              } else {
+
                 setShowFirstTimePopup(true);
-              },
+              }
             },
-          ]);
-        }
+          },
+        ]);
       } else {
         Alert.alert('Erro', resultado.erro || 'Erro ao fazer login');
       }
@@ -119,27 +165,23 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
-  // Função para lidar com a criação de workspace
   const handleCreateWorkspace = () => {
     setShowFirstTimePopup(false);
     navigation.navigate('CadastroWorkspace');
   };
 
-  // Função para pular e ir direto para home
   const handleSkipWorkspaceCreation = () => {
     setShowFirstTimePopup(false);
     navigation.navigate('Home');
   };
 
-  // Função para ir para cadastro
   const handleGoToSignup = () => {
     navigation.navigate('CadastroUsuario');
   };
 
-  // Função para atualizar campos do formulário
   const updateField = (field: 'email' | 'senha', value: string) => {
     setFormData(prev => ({...prev, [field]: value}));
-    // Limpar erro do campo quando usuário começar a digitar
+
     if (errors[field]) {
       setErrors(prev => ({...prev, [field]: undefined}));
     }
@@ -156,7 +198,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
           <Text style={styles.title}>Login</Text>
           <Text style={styles.subtitle}>Entre na sua conta para continuar</Text>
 
-          {/* Campo Email */}
+          {}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email *</Text>
             <TextInput
@@ -175,7 +217,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             )}
           </View>
 
-          {/* Campo Senha */}
+          {}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha *</Text>
             <TextInput
@@ -194,7 +236,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             )}
           </View>
 
-          {/* Botão Login */}
+          {}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={fazerLogin}
@@ -206,7 +248,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 
           <Text style={styles.requiredText}>* Campos obrigatórios</Text>
 
-          {/* Link para cadastro */}
+          {}
           <TouchableOpacity
             style={styles.linkContainer}
             onPress={handleGoToSignup}>
@@ -217,7 +259,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
         </View>
       </ScrollView>
 
-      {/* Popup de primeira vez */}
+      {}
       <FirstTimePopup
         visible={showFirstTimePopup}
         onCreateWorkspace={handleCreateWorkspace}

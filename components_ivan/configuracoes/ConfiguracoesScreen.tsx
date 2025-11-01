@@ -11,7 +11,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
 import { useTheme } from '../theme/ThemeContext';
 import ThemeToggle from '../theme/ThemeToggle';
-import GoogleCalendarService from '../../services/googleCalendarService';
 
 interface ConfiguracoesScreenProps {
   navigation: StackNavigationProp<RootStackParamList>;
@@ -43,39 +42,9 @@ const ConfiguracoesScreen: React.FC<ConfiguracoesScreenProps> = ({ navigation })
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Enviar Feedback', onPress: () => {
-          // Aqui poderia abrir um formulário ou email
+
           Alert.alert('Obrigado!', 'Seu feedback será enviado em breve.');
         }}
-      ]
-    );
-  };
-
-  const handleCalendarSettings = () => {
-    Alert.alert(
-      '📅 Configurações do Calendário',
-      'Configure como o app interage com seu calendário do Google.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Verificar Permissões', 
-          onPress: async () => {
-            const hasPermissions = await GoogleCalendarService.checkCalendarPermissions();
-            if (hasPermissions) {
-              Alert.alert('✅ Permissões OK', 'O app já tem permissões para acessar o calendário.');
-            } else {
-              const granted = await GoogleCalendarService.requestPermissionsWithUserFeedback();
-              if (granted) {
-                Alert.alert('✅ Sucesso', 'Permissões concedidas com sucesso!');
-              } else {
-                Alert.alert('❌ Permissões Negadas', 'Você pode conceder permissões depois nas configurações do Android.');
-              }
-            }
-          }
-        },
-        { 
-          text: 'Abrir Calendário', 
-          onPress: () => GoogleCalendarService.openCalendarApp()
-        }
       ]
     );
   };
@@ -83,8 +52,8 @@ const ConfiguracoesScreen: React.FC<ConfiguracoesScreenProps> = ({ navigation })
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* Seção Aparência */}
+
+        {}
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             🎨 Aparência
@@ -92,44 +61,18 @@ const ConfiguracoesScreen: React.FC<ConfiguracoesScreenProps> = ({ navigation })
           <Text style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
             Personalize a aparência do aplicativo
           </Text>
-          
+
           <View style={styles.settingItem}>
             <ThemeToggle showLabel={true} showSwitch={true} />
           </View>
         </View>
 
-        {/* Seção Integrações */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            🔗 Integrações
-          </Text>
-          
-          <TouchableOpacity
-            style={[styles.settingItem, styles.settingButton]}
-            onPress={handleCalendarSettings}>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingIcon}>📅</Text>
-              <View style={styles.settingText}>
-                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>
-                  Google Calendar
-                </Text>
-                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
-                  Sincronizar tarefas com calendário
-                </Text>
-              </View>
-              <Text style={[styles.settingArrow, { color: theme.colors.textSecondary }]}>
-                ›
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Seção Geral */}
+        {}
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             ⚙️ Geral
           </Text>
-          
+
           <TouchableOpacity
             style={[styles.settingItem, styles.settingButton]}
             onPress={handleAbout}>
@@ -188,12 +131,12 @@ const ConfiguracoesScreen: React.FC<ConfiguracoesScreenProps> = ({ navigation })
           </TouchableOpacity>
         </View>
 
-        {/* Seção Dados */}
+        {}
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             💾 Dados
           </Text>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingContent}>
               <Text style={styles.settingIcon}>📊</Text>
@@ -209,7 +152,7 @@ const ConfiguracoesScreen: React.FC<ConfiguracoesScreenProps> = ({ navigation })
           </View>
         </View>
 
-        {/* Espaçamento final */}
+        {}
         <View style={styles.bottomSpace} />
       </ScrollView>
     </View>

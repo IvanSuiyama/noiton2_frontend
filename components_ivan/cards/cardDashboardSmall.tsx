@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   Modal,
   ActivityIndicator,
-  Alert 
+  Alert
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
@@ -51,14 +51,14 @@ const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
     try {
       setLoading(true);
       const workspaceId = await getActiveWorkspaceId();
-      
+
       if (!workspaceId) {
         throw new Error('Nenhum workspace ativo encontrado');
       }
 
       const tarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
       calcularMetricas(tarefas || []);
-      
+
     } catch (error) {
       console.error('Erro ao carregar métricas:', error);
       Alert.alert('Erro', 'Erro ao carregar métricas');
@@ -125,14 +125,14 @@ const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
         </View>
       </TouchableOpacity>
 
-      {/* Modal com Métricas Resumidas */}
+      {}
       <Modal
         visible={showModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowModal(false)}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowModal(false)}
@@ -140,7 +140,7 @@ const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
           <View style={[styles.metricasModal, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>📊 Métricas Rápidas</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowModal(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
@@ -164,7 +164,7 @@ const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
               </View>
             )}
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.fullDashboardButton, { backgroundColor: theme.colors.primary }]}
               onPress={handleViewFullDashboard}
             >
@@ -179,11 +179,12 @@ const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
 
 const styles = StyleSheet.create({
   dashboardCard: {
-    width: 70,
-    height: 70,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 8,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -203,7 +204,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Estilos do Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',

@@ -55,7 +55,6 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
     }
   };
 
-
   const handleEditUser = () => {
     setShowUserModal(false);
     navigation.navigate('EditUsuario', { userEmail });
@@ -66,13 +65,12 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
     navigation.navigate('DellUser', { userEmail });
   };
 
-  // Botão de logoff: limpa todo o cache e volta para tela de login
   const handleLogoff = async () => {
     setShowUserModal(false);
     try {
       await AsyncStorage.clear();
     } catch (e) {
-      // ignore
+
     }
     navigation.reset({
       index: 0,
@@ -82,28 +80,28 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
 
   return (
     <View>
-      <View style={[styles.userCard, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.userInfo}>
-          <Text style={[styles.userNameText, { color: theme.colors.text }]}>{userFullName || userName}</Text>
-          <Text style={[styles.userLabel, { color: theme.colors.textSecondary }]}>Usuário</Text>
+      {}
+      <TouchableOpacity
+        style={[styles.userCard, { backgroundColor: theme.colors.surface }]}
+        onPress={() => setShowUserModal(true)}
+      >
+        <View style={[styles.userIcon, { backgroundColor: theme.colors.background }]}>
+          <Text style={[styles.userIconText, { color: theme.colors.text }]}>
+            👤
+          </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.userIcon, { backgroundColor: theme.colors.background }]}
-          onPress={() => setShowUserModal(true)}>
-          <Text style={styles.userIconText}>👤</Text>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
 
       <Modal
         visible={showUserModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowUserModal(false)}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowUserModal(false)}>
-          
+
           <View style={[styles.userDropdown, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.userDropdownHeader, { borderBottomColor: theme.colors.border }]}>
               <View style={[styles.userAvatar, { backgroundColor: theme.colors.background }]}>
@@ -111,7 +109,7 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
                   {(userFullName || userName).charAt(0).toUpperCase()}
                 </Text>
               </View>
-              
+
               <View style={styles.userDetails}>
                 <Text style={styles.userDropdownName}>{userFullName || userName}</Text>
                 <Text style={styles.userDropdownEmail}>{userEmail}</Text>
@@ -124,7 +122,7 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
             <View style={styles.separator} />
 
             <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handleEditUser}>
                 <Text style={styles.actionButtonIcon}>✏️</Text>
@@ -135,14 +133,14 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
                 <ThemeToggle showLabel={false} showSwitch={false} />
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handleLogoff}>
                 <Text style={styles.actionButtonIcon}>🚪</Text>
                 <Text style={styles.actionButtonText}>Sair</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, styles.deleteActionButton]}
                 onPress={handleDeleteUser}>
                 <Text style={styles.actionButtonIcon}>🗑️</Text>
@@ -157,38 +155,27 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+
   userCard: {
-    flex: 1,
-    flexDirection: 'row',
+    width: 60,
+    height: 60,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
-    padding: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userNameText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  userLabel: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginTop: 2,
+    padding: 8,
   },
   userIcon: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     backgroundColor: 'rgba(108, 117, 125, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
   },
   userIconText: {
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,

@@ -5,248 +5,191 @@ import {
   Dimensions,
   Text,
 } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
 
-interface BurndownData {
-  labels: string[];
-  ideal: number[];
-  atual: number[];
+interface MetricasData {
+  tarefasTotais: number;
+  tarefasConcluidas: number;
+  tarefasEmAndamento: number;
+  tarefasPendentes: number;
+  produtividadeSemanal?: number[];
+  ultimasSemanasLabels?: string[];
 }
 
-interface BurndownChartProps {
-  data: BurndownData;
+interface MetricasChartProps {
+  data: MetricasData;
   title: string;
-  width?: number;
-  height?: number;
+  isEquipe?: boolean;
 }
 
-const BurndownChart: React.FC<BurndownChartProps> = ({
+const MetricasChart: React.FC<MetricasChartProps> = ({
   data,
   title,
-  width = Dimensions.get('window').width - 32,
-  height = 200,
+  isEquipe = false,
 }) => {
-  // Calcular valores máximos para escala
-  const maxValue = Math.max(...data.ideal, ...data.atual, 0);
-  const padding = 40;
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
+  const { theme } = useTheme();
 
-  // Função para calcular posição X
-  const getX = (index: number) => {
-    return padding + (index / (data.labels.length - 1)) * chartWidth;
-  };
+  const porcentagemConcluida = data.tarefasTotais > 0
+    ? Math.round((data.tarefasConcluidas / data.tarefasTotais) * 100)
+    : 0;
 
-  // Função para calcular posição Y
-  const getY = (value: number) => {
-    return padding + (1 - value / maxValue) * chartHeight;
-  };
+  const porcentagemAndamento = data.tarefasTotais > 0
+    ? Math.round((data.tarefasEmAndamento / data.tarefasTotais) * 100)
+    : 0;
 
-  // Gerar pontos para linha ideal
-  const idealPoints = data.ideal.map((value, index) => ({
-    x: getX(index),
-    y: getY(value),
-  }));
-
-  // Gerar pontos para linha atual
-  const atualPoints = data.atual.map((value, index) => ({
-    x: getX(index),
-    y: getY(value),
-  }));
-
-  // Função para criar path SVG
-  const createPath = (points: {x: number, y: number}[]) => {
-    return points.reduce((path, point, index) => {
-      if (index === 0) {
-        return `M ${point.x} ${point.y}`;
-      }
-      return `${path} L ${point.x} ${point.y}`;
-    }, '');
-  };
+  const porcentagemPendente = data.tarefasTotais > 0
+    ? Math.round((data.tarefasPendentes / data.tarefasTotais) * 100)
+    : 0;
 
   return (
-    <View style={[styles.container]}>
-      <Text style={[styles.title]}>
-        {title}
+    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
+      <Text style={[styles.title, { color: theme.colors.text }]}>
+        {title} - {isEquipe ? 'Equipe' : 'Individual'}
       </Text>
-      
-      <View style={styles.chartContainer}>
-        {/* Gráfico usando Views simples */}
-        <View style={[styles.chartArea, { width, height }]}>
-          
-          {/* Linhas de grade horizontais */}
-          {Array.from({ length: 5 }, (_, i) => (
-            <View
-              key={`grid-h-${i}`}
-              style={[
-                styles.gridLine,
-                {
-                  top: padding + (i / 4) * chartHeight,
-                  left: padding,
-                  width: chartWidth,
-                  height: 1,
-                }
-              ]}
-            />
-          ))}
 
-          {/* Linhas de grade verticais */}
-          {data.labels.map((_, index) => (
-            <View
-              key={`grid-v-${index}`}
-              style={[
-                styles.gridLine,
-                {
-                  top: padding,
-                  left: getX(index),
-                  width: 1,
-                  height: chartHeight,
-                }
-              ]}
-            />
-          ))}
-
-          {/* Linha ideal (cinza) */}
-          {idealPoints.map((point, index) => {
-            if (index === idealPoints.length - 1) { return null; }
-            const nextPoint = idealPoints[index + 1];
-            const lineWidth = Math.sqrt(
-              Math.pow(nextPoint.x - point.x, 2) + Math.pow(nextPoint.y - point.y, 2)
-            );
-            const angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x);
-            
-            return (
-              <View
-                key={`ideal-${index}`}
-                style={[
-                  styles.lineSegment,
-                  styles.idealLine,
-                  {
-                    left: point.x,
-                    top: point.y - 1,
-                    width: lineWidth,
-                    transform: [{ rotate: `${angle}rad` }],
-                  }
-                ]}
-              />
-            );
-          })}
-
-          {/* Linha atual (azul) */}
-          {atualPoints.map((point, index) => {
-            if (index === atualPoints.length - 1) { return null; }
-            const nextPoint = atualPoints[index + 1];
-            const lineWidth = Math.sqrt(
-              Math.pow(nextPoint.x - point.x, 2) + Math.pow(nextPoint.y - point.y, 2)
-            );
-            const angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x);
-            
-            return (
-              <View
-                key={`atual-${index}`}
-                style={[
-                  styles.lineSegment,
-                  styles.atualLine,
-                  {
-                    left: point.x,
-                    top: point.y - 1.5,
-                    width: lineWidth,
-                    transform: [{ rotate: `${angle}rad` }],
-                  }
-                ]}
-              />
-            );
-          })}
-
-          {/* Pontos da linha ideal */}
-          {idealPoints.map((point, index) => (
-            <View
-              key={`ideal-dot-${index}`}
-              style={[
-                styles.dot,
-                styles.idealDot,
-                {
-                  left: point.x - 4,
-                  top: point.y - 4,
-                }
-              ]}
-            />
-          ))}
-
-          {/* Pontos da linha atual */}
-          {atualPoints.map((point, index) => (
-            <View
-              key={`atual-dot-${index}`}
-              style={[
-                styles.dot,
-                styles.atualDot,
-                {
-                  left: point.x - 5,
-                  top: point.y - 5,
-                }
-              ]}
-            />
-          ))}
-
-          {/* Labels do eixo X */}
-          {data.labels.map((label, index) => (
-            <Text
-              key={`label-${index}`}
-              style={[
-                styles.axisLabel,
-                {
-                  left: getX(index) - 20,
-                  top: height - 20,
-                  width: 40,
-                }
-              ]}
-            >
-              {label}
-            </Text>
-          ))}
-
-          {/* Labels do eixo Y */}
-          {Array.from({ length: 5 }, (_, i) => {
-            const value = Math.round((maxValue * (4 - i)) / 4);
-            return (
-              <Text
-                key={`y-label-${i}`}
-                style={[
-                  styles.yAxisLabel,
-                  {
-                    left: 5,
-                    top: padding + (i / 4) * chartHeight - 8,
-                  }
-                ]}
-              >
-                {value}
-              </Text>
-            );
-          })}
-        </View>
+      {}
+      <View style={styles.metricsGrid}>
+        <MetricaCard
+          valor={data.tarefasConcluidas}
+          label="Concluídas"
+          cor="#4CAF50"
+          theme={theme}
+        />
+        <MetricaCard
+          valor={data.tarefasEmAndamento}
+          label="Em Andamento"
+          cor="#FF9800"
+          theme={theme}
+        />
+        <MetricaCard
+          valor={data.tarefasPendentes}
+          label="Pendentes"
+          cor="#F44336"
+          theme={theme}
+        />
+        <MetricaCard
+          valor={data.tarefasTotais}
+          label="Total"
+          cor={theme.colors.primary}
+          theme={theme}
+        />
       </View>
 
-      {/* Legenda */}
-      <View style={styles.legendContainer}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, styles.idealLegendDot]} />
-          <Text style={[styles.legendText]}>
-            Burndown Ideal
-          </Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, styles.atualLegendDot]} />
-          <Text style={[styles.legendText]}>
-            Burndown Atual
-          </Text>
-        </View>
+      {}
+      <View style={styles.progressSection}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Distribuição das Tarefas
+        </Text>
+
+        <BarraProgresso
+          porcentagem={porcentagemConcluida}
+          cor="#4CAF50"
+          label="Concluídas"
+          theme={theme}
+        />
+
+        <BarraProgresso
+          porcentagem={porcentagemAndamento}
+          cor="#FF9800"
+          label="Em Andamento"
+          theme={theme}
+        />
+
+        <BarraProgresso
+          porcentagem={porcentagemPendente}
+          cor="#F44336"
+          label="Pendentes"
+          theme={theme}
+        />
       </View>
+
+      {}
+      {data.produtividadeSemanal && data.produtividadeSemanal.length > 0 && (
+        <View style={styles.weeklySection}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Produtividade Semanal
+          </Text>
+          <View style={styles.weeklyChart}>
+            {data.produtividadeSemanal.map((valor, index) => {
+              const maxValue = Math.max(...data.produtividadeSemanal!);
+              const altura = maxValue > 0 ? (valor / maxValue) * 80 : 0;
+
+              return (
+                <View key={index} style={styles.weeklyBar}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        height: altura,
+                        backgroundColor: theme.colors.primary,
+                      }
+                    ]}
+                  />
+                  <Text style={[styles.barValue, { color: theme.colors.text }]}>
+                    {valor}
+                  </Text>
+                  <Text style={[styles.barLabel, { color: theme.colors.textSecondary }]}>
+                    {data.ultimasSemanasLabels?.[index] || `S${index + 1}`}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
 
+const BarraProgresso = ({
+  porcentagem,
+  cor,
+  label,
+  theme
+}: {
+  porcentagem: number;
+  cor: string;
+  label: string;
+  theme: any;
+}) => (
+  <View style={styles.progressContainer}>
+    <View style={styles.progressHeader}>
+      <Text style={[styles.progressLabel, { color: theme.colors.text }]}>{label}</Text>
+      <Text style={[styles.progressPercent, { color: theme.colors.text }]}>{porcentagem}%</Text>
+    </View>
+    <View style={[styles.progressBarBackground, { backgroundColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.progressBarFill,
+          {
+            backgroundColor: cor,
+            width: `${porcentagem}%`
+          }
+        ]}
+      />
+    </View>
+  </View>
+);
+
+const MetricaCard = ({
+  valor,
+  label,
+  cor,
+  theme
+}: {
+  valor: number;
+  label: string;
+  cor: string;
+  theme: any;
+}) => (
+  <View style={[styles.metricCard, { backgroundColor: theme.colors.surface }]}>
+    <Text style={[styles.metricValue, { color: cor }]}>{valor}</Text>
+    <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>{label}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 16,
     margin: 8,
@@ -261,89 +204,99 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 16,
     textAlign: 'center',
-    color: '#333',
   },
-  chartContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  chartArea: {
-    position: 'relative',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  gridLine: {
-    position: 'absolute',
-    backgroundColor: '#e0e0e0',
-  },
-  lineSegment: {
-    position: 'absolute',
-    height: 2,
-    transformOrigin: '0% 50%',
-  },
-  idealLine: {
-    backgroundColor: '#888888',
-    height: 2,
-  },
-  atualLine: {
-    backgroundColor: '#007bff',
-    height: 3,
-  },
-  dot: {
-    position: 'absolute',
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  idealDot: {
-    width: 8,
-    height: 8,
-    backgroundColor: '#888888',
-  },
-  atualDot: {
-    width: 10,
-    height: 10,
-    backgroundColor: '#007bff',
-  },
-  axisLabel: {
-    position: 'absolute',
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  yAxisLabel: {
-    position: 'absolute',
-    fontSize: 12,
-    color: '#666',
-    width: 30,
-  },
-  legendContainer: {
+  metricsGrid: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
-  legendItem: {
-    flexDirection: 'row',
+  metricCard: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  metricValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
-  idealLegendDot: {
-    backgroundColor: '#888888',
-  },
-  atualLegendDot: {
-    backgroundColor: '#007bff',
-  },
-  legendText: {
+  metricLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    textAlign: 'center',
+  },
+  progressSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  progressContainer: {
+    marginBottom: 12,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  progressPercent: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressBarBackground: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  weeklySection: {
+    marginTop: 10,
+  },
+  weeklyChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    height: 120,
+    paddingHorizontal: 10,
+  },
+  weeklyBar: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
+    marginHorizontal: 2,
+  },
+  barFill: {
+    width: 20,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  barValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  barLabel: {
+    fontSize: 10,
+    textAlign: 'center',
   },
 });
 
-export default BurndownChart;
+export default MetricasChart;

@@ -12,7 +12,7 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
 import { useTheme } from '../theme/ThemeContext';
-import BurndownChart from '../charts/BurndownChart';
+import MetricasChart from '../charts/BurndownChart';
 import {
   apiCall,
   getActiveWorkspaceId,
@@ -49,7 +49,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
     pendentes: 0,
   });
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
-  const [isEquipeView, setIsEquipeView] = useState(true); // Switch equipe/individual
+  const [isEquipeView, setIsEquipeView] = useState(false);
   const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
@@ -59,33 +59,61 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
   const carregarDados = async () => {
     try {
       setLoading(true);
-      
+
       const workspaceId = await getActiveWorkspaceId();
       const email = await getUserEmail();
-      
+
       if (!workspaceId) {
         throw new Error('Nenhum workspace ativo encontrado');
       }
 
       setUserEmail(email || '');
 
-      // Carregar informações do workspace
-      const workspace = await apiCall(`/workspaces/${workspaceId}`, 'GET');
-      setWorkspaceInfo(workspace);
+      let workspace;
+      try {
 
-      // Carregar tarefas com filtros baseados na visualização
-      let endpoint = `/tarefas/workspace/${workspaceId}`;
-      if (!isEquipeView && workspace.tipo === 'equipe') {
-        // Visualização individual em workspace de equipe
-        endpoint += `/filtros-avancados?minhas_tarefas=true`;
+        workspace = await apiCall(`/workspaces/id/${workspaceId}`, 'GET');
+        setWorkspaceInfo(workspace);
+      } catch (workspaceError) {
+        console.error('Erro ao carregar workspace:', workspaceError);
+
+        workspace = {
+          id_workspace: workspaceId,
+          nome: 'Workspace',
+          tipo: 'individual' as 'individual' | 'equipe'
+        };
+        setWorkspaceInfo(workspace);
       }
 
-      const tarefas = await apiCall(endpoint, 'GET');
-      calcularMetricas(tarefas || []);
-      
+      try {
+
+        let tarefas;
+        if (!isEquipeView && workspace?.tipo === 'equipe') {
+
+          try {
+            tarefas = await apiCall(`/tarefas/workspace/${workspaceId}/filtros-avancados?minhas_tarefas=true`, 'GET');
+          } catch (filtroError) {
+            console.log('Filtros avançados não disponíveis, usando endpoint simples');
+
+            tarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
+          }
+        } else {
+
+          tarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
+        }
+
+        calcularMetricas(tarefas || []);
+      } catch (tarefasError) {
+        console.error('Erro ao carregar tarefas:', tarefasError);
+
+        calcularMetricas([]);
+        Alert.alert('Aviso', 'Não foi possível carregar as tarefas. Mostrando dados vazios.');
+      }
+
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
-      Alert.alert('Erro', 'Erro ao carregar métricas do dashboard');
+      console.error('Erro geral ao carregar dados do dashboard:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      Alert.alert('Erro', `Erro ao carregar métricas: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -93,7 +121,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
 
   const calcularMetricas = (tarefas: any[]) => {
     const now = new Date();
-    
+
     const metricsData: MetricasData = {
       total: tarefas.length,
       concluidas: 0,
@@ -121,13 +149,6 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
     setMetricas(metricsData);
   };
 
-  // Dados para o gráfico burndown (exemplo simplificado)
-  const burndownData = {
-    labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
-    ideal: [metricas.total, Math.floor(metricas.total * 0.75), Math.floor(metricas.total * 0.5), Math.floor(metricas.total * 0.25)],
-    atual: [metricas.total, metricas.total - Math.floor(metricas.concluidas * 0.3), metricas.total - Math.floor(metricas.concluidas * 0.6), metricas.total - metricas.concluidas],
-  };
-
   const exportarPDF = () => {
     Alert.alert(
       'Exportar PDF',
@@ -135,7 +156,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Baixar PDF', onPress: () => {
-          // TODO: Implementar exportação real de PDF
+
           Alert.alert('PDF', 'Funcionalidade de PDF será implementada em breve!');
         }}
       ]
@@ -166,7 +187,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cabeçalho */}
+        {}
         <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.headerContent}>
             <Text style={[styles.title, { color: theme.colors.text }]}>
@@ -177,7 +198,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
             </Text>
           </View>
 
-          {/* Switch Equipe/Individual (só aparece em workspaces de equipe) */}
+          {}
           {workspaceInfo?.tipo === 'equipe' && (
             <View style={styles.switchContainer}>
               <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>
@@ -195,7 +216,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
             </View>
           )}
 
-          {/* Botão Exportar PDF */}
+          {}
           <TouchableOpacity
             style={[styles.exportButton, { backgroundColor: theme.colors.primary }]}
             onPress={exportarPDF}>
@@ -203,7 +224,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
           </TouchableOpacity>
         </View>
 
-        {/* Métricas Cards */}
+        {}
         <View style={styles.metricsContainer}>
           {renderMetricaCard('Total', metricas.total, theme.colors.text, '📝')}
           {renderMetricaCard('Concluídas', metricas.concluidas, theme.colors.success, '✅')}
@@ -211,10 +232,18 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
           {renderMetricaCard('Atrasadas', metricas.atrasadas, theme.colors.error, '⚠️')}
         </View>
 
-        {/* Gráfico Burndown */}
-        <BurndownChart
-          data={burndownData}
-          title={`Burndown Chart - ${isEquipeView ? 'Equipe' : 'Individual'}`}
+        {}
+        <MetricasChart
+          data={{
+            tarefasTotais: metricas.total,
+            tarefasConcluidas: metricas.concluidas,
+            tarefasEmAndamento: metricas.emAndamento,
+            tarefasPendentes: metricas.pendentes,
+            produtividadeSemanal: [4, 6, 5, 8, 3],
+            ultimasSemanasLabels: ['S1', 'S2', 'S3', 'S4', 'S5'],
+          }}
+          title="Métricas do Projeto"
+          isEquipe={isEquipeView}
         />
       </ScrollView>
     </View>

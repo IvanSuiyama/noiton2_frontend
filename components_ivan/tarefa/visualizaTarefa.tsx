@@ -61,15 +61,14 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
   const [loading, setLoading] = useState(true);
   const [loadingComentarios, setLoadingComentarios] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [workspaceEquipe, setWorkspaceEquipe] = useState<boolean>(false);
   const [permissoesModalVisible, setPermissoesModalVisible] = useState(false);
   const [temComentarios, setTemComentarios] = useState(false);
   const [comentarios, setComentarios] = useState<any[]>([]);
-  
-  // Estados para anexos
+
   const [anexos, setAnexos] = useState<AnexoTarefa[]>([]);
   const [loadingAnexos, setLoadingAnexos] = useState(false);
 
-  // Parâmetros da rota - pode receber id_tarefa OU titulo
   const { id_tarefa, titulo } = route.params || {};
 
   useEffect(() => {
@@ -82,7 +81,6 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     }
   }, [id_tarefa, workspaceId]);
 
-  // Recarregar comentários quando a tela volta ao foco
   useFocusEffect(
     React.useCallback(() => {
       if (tarefa && tarefa.id_tarefa) {
@@ -95,6 +93,25 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     try {
       const id = await getActiveWorkspaceId();
       setWorkspaceId(id);
+
+      if (id) {
+        try {
+          console.log('🏢 Buscando informações do workspace:', id);
+          const workspaceInfo = await apiCall(`/workspaces/id/${id}`, 'GET');
+          console.log('🏢 Workspace info recebido:', workspaceInfo);
+          setWorkspaceEquipe(workspaceInfo.tipo === 'equipe');
+        } catch (error) {
+          console.log('❌ Erro ao buscar info do workspace:', error);
+          console.log('❌ Tipo do erro:', typeof error);
+          console.log('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
+
+          if (error instanceof SyntaxError && error.message.includes('JSON')) {
+            console.log('🚨 API retornou HTML ao invés de JSON - provavelmente endpoint não existe');
+          }
+
+          setWorkspaceEquipe(false);
+        }
+      }
     } catch (error) {
       console.error('Erro ao obter workspace ativo:', error);
       Alert.alert('Erro', 'Não foi possível obter o workspace ativo');
@@ -111,7 +128,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       let tarefaData: TarefaCompleta;
 
       if (id_tarefa) {
-        // Buscar tarefa pelo workspace (como antes)
+
         const todasTarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
         const tarefaEncontrada = todasTarefas.find((t: TarefaCompleta) => t.id_tarefa === id_tarefa);
         if (!tarefaEncontrada) {
@@ -119,7 +136,6 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
         }
         tarefaData = tarefaEncontrada;
 
-        // Buscar categorias da tarefa
         try {
           const categorias = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
           tarefaData = { ...tarefaData, categorias };
@@ -127,10 +143,9 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           tarefaData = { ...tarefaData, categorias: [] };
         }
 
-        // Verificar se não tem permissão para visualizar (caso implementado no backend)
         if (tarefaData.nivel_acesso === undefined && tarefaData.pode_editar === false && tarefaData.pode_apagar === false) {
           Alert.alert(
-            'Permissão negada', 
+            'Permissão negada',
             'Você não tem permissão para visualizar esta tarefa.',
             [{ text: 'OK', onPress: () => navigation.goBack() }]
           );
@@ -138,7 +153,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
         }
       } else if (titulo) {
         tarefaData = await apiCall(`/tarefas/workspace/${workspaceId}/titulo/${encodeURIComponent(titulo)}`, 'GET');
-        // Buscar categorias da tarefa por id_tarefa do resultado
+
         if (tarefaData && tarefaData.id_tarefa) {
           try {
             const categorias = await apiCall(`/tarefas/${tarefaData.id_tarefa}/categorias`, 'GET');
@@ -153,17 +168,16 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
 
       setTarefa(tarefaData);
       setLoading(false);
-      
-      // Carregar comentários e anexos em segundo plano após carregar a tarefa
+
       setTimeout(() => {
         carregarComentarios(tarefaData.id_tarefa);
         carregarAnexos(tarefaData.id_tarefa);
       }, 100);
-      
+
     } catch (error: any) {
       console.error('Erro ao carregar tarefa:', error);
       Alert.alert(
-        'Erro', 
+        'Erro',
         error.message || 'Não foi possível carregar a tarefa',
         [
           {
@@ -200,7 +214,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
   const carregarAnexos = async (idTarefa: number) => {
     setLoadingAnexos(true);
     try {
-      const anexosData = await AnexoService.listarAnexosTarefa(idTarefa);
+      const anexosData = await AnexoService.listarAnexos(idTarefa);
       setAnexos(anexosData);
     } catch (error) {
       console.error('Erro ao carregar anexos:', error);
@@ -233,8 +247,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
 
   const excluirComentario = async (comentario: any) => {
     console.log('🗑️ Iniciando exclusão do comentário:', comentario.id_comentario);
-    
-    // Função callback para recarregar comentários após exclusão
+
     const onDelete = (comentarioId: number) => {
       console.log('✅ Comentário excluído com sucesso! ID:', comentarioId);
       console.log('🔄 Recarregando lista de comentários...');
@@ -243,7 +256,6 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       }
     };
 
-    // Usar o componente dellComentario padronizado
     try {
       await confirmarDeletarComentario(comentario, onDelete);
     } catch (error) {
@@ -256,9 +268,9 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       return 'Não informado';
     }
     const date = new Date(data);
-    return date.toLocaleDateString('pt-BR') + ' às ' + date.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleDateString('pt-BR') + ' às ' + date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -282,7 +294,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Tarefa não encontrada</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>← Voltar</Text>
@@ -293,9 +305,9 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>← Voltar</Text>
@@ -305,21 +317,21 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Título e Status */}
+        {}
         <View style={styles.section}>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{tarefa.titulo}</Text>
             <View style={[
-              styles.statusBadge, 
-              { backgroundColor: tarefa.status === 'concluido' ? '#28a745' : 
+              styles.statusBadge,
+              { backgroundColor: tarefa.status === 'concluido' ? '#28a745' :
                                  tarefa.status === 'em_andamento' ? '#007bff' :
                                  tarefa.status === 'atrasada' ? '#dc3545' : '#6c757d' }
             ]}>
               <Text style={styles.statusText}>{STATUS_LABELS[tarefa.status]}</Text>
             </View>
           </View>
-          
-          {/* Prioridade */}
+
+          {}
           <View style={styles.priorityContainer}>
             <Text style={styles.priorityLabel}>Prioridade:</Text>
             <View style={[
@@ -331,7 +343,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         </View>
 
-        {/* Descrição */}
+        {}
         {tarefa.descricao && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>📝 Descrição</Text>
@@ -339,7 +351,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         )}
 
-        {/* Datas */}
+        {}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Datas</Text>
           <View style={styles.dateRow}>
@@ -352,7 +364,7 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         </View>
 
-        {/* Recorrência */}
+        {}
         {tarefa.recorrente && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>🔄 Recorrência</Text>
@@ -364,9 +376,9 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         )}
 
-        {/* Responsáveis removido (não existe mais no modelo) */}
+        {}
 
-        {/* Categorias */}
+        {}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🏷️ Categorias</Text>
           <View style={styles.categoriasContainer}>
@@ -385,33 +397,9 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           </View>
         </View>
 
-        {/* Informações Técnicas
-        <View style={[styles.section, styles.lastSection]}>
-          <Text style={styles.sectionTitle}>ℹ️ Informações</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>ID da Tarefa:</Text>
-            <Text style={styles.infoValue}>#{tarefa.id_tarefa}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Concluída:</Text>
-            <Text style={[
-              styles.infoValue,
-              { color: tarefa.concluida ? '#28a745' : '#dc3545' }
-            ]}>
-              {tarefa.concluida ? 'Sim' : 'Não'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>ID do Criador:</Text>
-            <Text style={styles.infoValue}>{tarefa.id_usuario}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>ID do Workspace:</Text>
-            <Text style={styles.infoValue}>{tarefa.id_workspace}</Text>
-          </View>
-        </View> */}
+        {}
 
-        {/* Seção de Anexos */}
+        {}
         <View style={styles.sectionAnexos}>
           <Text style={styles.sectionTitle}>📎 Anexos</Text>
 
@@ -457,16 +445,16 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           )}
         </View>
 
-        {/* Seção de Comentários */}
+        {}
         <View style={styles.sectionComentarios}>
           <Text style={styles.sectionTitle}>💬 Comentários</Text>
-          
+
           {loadingComentarios ? (
             <View style={styles.loadingComentarios}>
               <Text style={styles.loadingComentariosText}>⏳ Carregando comentários...</Text>
             </View>
           ) : comentarios.length > 0 ? (
-            <ScrollView 
+            <ScrollView
               style={styles.comentariosScrollView}
               showsVerticalScrollIndicator={true}
               nestedScrollEnabled={true}>
@@ -478,30 +466,30 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
                       👤 {comentario.email || comentario.nome_usuario || 'Usuário'}
                     </Text>
                     <Text style={styles.comentarioData}>
-                      {comentario.data_criacao ? 
+                      {comentario.data_criacao ?
                         new Date(comentario.data_criacao).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: '2-digit',
                           year: 'numeric'
-                        }) : 
+                        }) :
                         'Hoje'
                       }
                     </Text>
                   </View>
-                  
+
                   <Text style={styles.comentarioTexto}>
                     {comentario.descricao || comentario.conteudo || comentario.texto || comentario.comentario || comentario.mensagem || 'Comentário sem conteúdo'}
                   </Text>
-                  
+
                   <View style={styles.comentarioAcoes}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.comentarioAcao, styles.comentarioAcaoEdit]}
                       onPress={() => editarComentario(comentario)}
                       activeOpacity={0.7}>
                       <Text style={styles.comentarioAcaoTexto}>✏️ Editar</Text>
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                       style={[styles.comentarioAcao, styles.comentarioAcaoDelete]}
                       onPress={() => excluirComentario(comentario)}
                       activeOpacity={0.7}>
@@ -519,8 +507,8 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
               </Text>
             </View>
           )}
-          
-          {/* Botão para adicionar novo comentário */}
+
+          {}
           <TouchableOpacity
             style={styles.novoComentarioButton}
             onPress={adicionarComentario}
@@ -528,18 +516,20 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
             <Text style={styles.novoComentarioButtonText}>💬 Novo Comentário</Text>
           </TouchableOpacity>
         </View>
-        
-        {/* Botão de Gerenciar Permissões */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.permissaoButton}
-            onPress={() => setPermissoesModalVisible(true)}>
-            <Text style={styles.permissaoButtonText}>👥 Gerenciar Permissões</Text>
-          </TouchableOpacity>
-        </View>
+
+        {}
+        {workspaceEquipe && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.permissaoButton}
+              onPress={() => setPermissoesModalVisible(true)}>
+              <Text style={styles.permissaoButtonText}>👥 Gerenciar Permissões</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Modal de Gerenciar Permissões */}
+      {}
       {tarefa && workspaceId && (
         <GerenciarPermissoesModal
           visible={permissoesModalVisible}
@@ -553,7 +543,6 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
         />
       )}
 
-
     </View>
   );
 };
@@ -563,7 +552,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
   },
-  
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -574,32 +563,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#3a3a3a',
   },
-  
+
   backButton: {
     padding: 8,
   },
-  
+
   backButtonText: {
     color: '#007bff',
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   headerTitle: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
   },
-  
+
   headerSpacer: {
     width: 40,
   },
-  
+
   content: {
     flex: 1,
     padding: 16,
   },
-  
+
   section: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
@@ -608,15 +597,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#3a3a3a',
   },
-  
+
   lastSection: {
     marginBottom: 32,
   },
-  
+
   titleContainer: {
     marginBottom: 16,
   },
-  
+
   title: {
     color: '#ffffff',
     fontSize: 24,
@@ -624,143 +613,143 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 30,
   },
-  
+
   statusBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
-  
+
   statusText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   priorityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  
+
   priorityLabel: {
     color: '#6c757d',
     fontSize: 14,
     marginRight: 8,
   },
-  
+
   priorityBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  
+
   priorityText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   sectionTitle: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
   },
-  
+
   description: {
     color: '#e0e0e0',
     fontSize: 16,
     lineHeight: 24,
   },
-  
+
   dateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  
+
   dateLabel: {
     color: '#6c757d',
     fontSize: 14,
   },
-  
+
   dateValue: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '500',
   },
-  
+
   recurrenceContainer: {
     backgroundColor: '#3a3a3a',
     padding: 12,
     borderRadius: 8,
   },
-  
+
   recurrenceText: {
     color: '#ffc107',
     fontSize: 14,
     fontWeight: '500',
   },
-  
+
   responsavelItem: {
     marginBottom: 4,
   },
-  
+
   responsavelText: {
     color: '#e0e0e0',
     fontSize: 14,
   },
-  
+
   categoriasContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  
+
   categoriaChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
-  
+
   categoriaText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '500',
   },
-  
+
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  
+
   infoLabel: {
     color: '#6c757d',
     fontSize: 14,
   },
-  
+
   infoValue: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '500',
   },
-  
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#1a1a1a',
   },
-  
+
   loadingText: {
     color: '#6c757d',
     fontSize: 16,
   },
-  
+
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -768,7 +757,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     padding: 20,
   },
-  
+
   errorText: {
     color: '#dc3545',
     fontSize: 18,
@@ -946,7 +935,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Estilos para seção de anexos
   sectionAnexos: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,

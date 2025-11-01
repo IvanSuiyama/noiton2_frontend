@@ -1,56 +1,46 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import { ThemeProvider } from './theme/ThemeContext';
+import CalendarSyncService from '../services/calendarSyncService';
 
-// Telas de Autenticação e Boas-vindas
 import WelcomeScreen from './welcome/WelcomeScreen';
 import LoginScreen from './auth/LoginScreen';
 
-// Telas de Usuário
 import CadUsuario from './usuario/cadUsuario';
 import EditUsuario from './usuario/editUsuario';
 import SelectUsuario from './usuario/selectUsuario';
 import DellUser from './usuario/dellUser';
 
-// Telas de Workspace
 import CadWorkspace from './workspace/cadWorkspace';
 import EditWorkspace from './workspace/editWorkspace';
 
-// Telas de Tarefa
 import CadTarefa from './tarefa/cadTarefa';
 import EditTarefa from './tarefa/editTarefa';
 import VisualizaTarefa from './tarefa/visualizaTarefa';
 
-// Telas de Categoria
 import CadCategoria from './categoria/cadCategoria';
 
-// Telas de Comentário
 import CadComentario from './comentario/cadComentario';
 import EditComentarioScreen from './comentario/EditComentarioScreen';
 
-// Tela Principal
 import HomeScreen from './home/HomeScreen';
 
-// Novas Telas
 import CardFavoritos from './cards/cardFavoritos';
 import ConfiguracoesScreen from './configuracoes/ConfiguracoesScreen';
 import CalendarioScreen from './calendario/CalendarioScreen';
 import CardDashboard from './cards/CardDashboard';
 
-// Definir tipos para as rotas
 export type RootStackParamList = {
-  // Navegação inicial e autenticação
+
   Welcome: undefined;
   Login: undefined;
-  
-  // Telas principais
+
   Home: undefined;
-  
-  // Usuários
+
   CadastroUsuario: undefined;
   EditUsuario: { userEmail: string };
-  SelectUsuario: { 
+  SelectUsuario: {
     onSelectUser?: (user: any) => void;
     multiSelect?: boolean;
     selectedUsers?: any[];
@@ -58,10 +48,9 @@ export type RootStackParamList = {
     showActions?: boolean;
   };
   DellUser: { userEmail?: string };
-  
-  // Workspaces
+
   CadastroWorkspace: undefined;
-  EditWorkspace: { 
+  EditWorkspace: {
     workspaceName: string;
     userEmail: string;
   };
@@ -72,20 +61,16 @@ export type RootStackParamList = {
     selectedWorkspaces?: any[];
     showActions?: boolean;
   };
-  
-  // Tarefas
+
   CadastroTarefa: undefined;
   EditTarefa: { id_tarefa: number };
   VisualizaTarefa: { id_tarefa?: number; titulo?: string };
-  
-  // Categorias
+
   CadastroCategoria: undefined;
-  
-  // Comentários
+
   CadComentario: { id_tarefa: number; titulo: string };
   EditComentario: { comentario: any; id_tarefa: number; titulo_tarefa: string };
-  
-  // Novas telas
+
   CardFavoritos: undefined;
   Configuracoes: undefined;
   Calendario: undefined;
@@ -95,6 +80,11 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 const Router: React.FC = () => {
+  useEffect(() => {
+
+    CalendarSyncService.initializeAutoSync();
+  }, []);
+
   return (
     <ThemeProvider>
       <NavigationContainer>
@@ -102,20 +92,20 @@ const Router: React.FC = () => {
         initialRouteName="Welcome"
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#2a2a2a', // Dark theme header
+            backgroundColor: '#2a2a2a',
           },
           headerTintColor: '#ffffff',
           headerTitleStyle: {
             fontWeight: 'bold',
           },
           cardStyle: {
-            backgroundColor: '#1a1a1a', // Dark theme background
+            backgroundColor: '#1a1a1a',
           },
         }}>
-        
-        {/* ========== FLUXO DE AUTENTICAÇÃO ========== */}
-        
-        {/* Tela de Boas-vindas */}
+
+        {}
+
+        {}
         <Stack.Screen
           name="Welcome"
           component={WelcomeScreen}
@@ -124,7 +114,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Tela de Login */}
+        {}
         <Stack.Screen
           name="Login"
           component={LoginScreen}
@@ -134,9 +124,9 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* ========== TELA PRINCIPAL ========== */}
-        
-        {/* Home Screen */}
+        {}
+
+        {}
         <Stack.Screen
           name="Home"
           component={HomeScreen}
@@ -145,9 +135,9 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* ========== GESTÃO DE USUÁRIOS ========== */}
-        
-        {/* Cadastro de Usuário */}
+        {}
+
+        {}
         <Stack.Screen
           name="CadastroUsuario"
           component={CadUsuario}
@@ -157,7 +147,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Edição de Usuário */}
+        {}
         <Stack.Screen
           name="EditUsuario"
           component={EditUsuario}
@@ -167,7 +157,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Seleção de Usuários */}
+        {}
         <Stack.Screen
           name="SelectUsuario"
           component={SelectUsuario}
@@ -177,7 +167,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Exclusão de Usuário */}
+        {}
         <Stack.Screen
           name="DellUser"
           component={DellUser}
@@ -187,9 +177,9 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* ========== GESTÃO DE WORKSPACES ========== */}
-        
-        {/* Cadastro de Workspace */}
+        {}
+
+        {}
         <Stack.Screen
           name="CadastroWorkspace"
           component={CadWorkspace}
@@ -199,7 +189,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Edição de Workspace */}
+        {}
         <Stack.Screen
           name="EditWorkspace"
           component={EditWorkspace}
@@ -209,9 +199,9 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* ========== GESTÃO DE TAREFAS ========== */}
-        
-        {/* Cadastro de Tarefa */}
+        {}
+
+        {}
         <Stack.Screen
           name="CadastroTarefa"
           component={CadTarefa}
@@ -221,7 +211,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Edição de Tarefa */}
+        {}
         <Stack.Screen
           name="EditTarefa"
           component={EditTarefa}
@@ -231,7 +221,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Visualização de Tarefa */}
+        {}
         <Stack.Screen
           name="VisualizaTarefa"
           component={VisualizaTarefa}
@@ -241,9 +231,9 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* ========== GESTÃO DE CATEGORIAS ========== */}
-        
-        {/* Cadastro de Categoria */}
+        {}
+
+        {}
         <Stack.Screen
           name="CadastroCategoria"
           component={CadCategoria}
@@ -253,29 +243,29 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* ========== GESTÃO DE COMENTÁRIOS ========== */}
-        
-        {/* Comentários de Tarefa */}
+        {}
+
+        {}
         <Stack.Screen
           name="CadComentario"
           component={CadComentario}
           options={{
-            headerShown: false, // Usando header customizado
+            headerShown: false,
           }}
         />
 
-        {/* Editar Comentário */}
+        {}
         <Stack.Screen
           name="EditComentario"
           component={EditComentarioScreen}
           options={{
-            headerShown: false, // Usando header customizado
+            headerShown: false,
           }}
         />
 
-        {/* ========== NOVAS FUNCIONALIDADES ========== */}
-        
-        {/* Tarefas Favoritas */}
+        {}
+
+        {}
         <Stack.Screen
           name="CardFavoritos"
           component={CardFavoritos}
@@ -285,7 +275,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Configurações */}
+        {}
         <Stack.Screen
           name="Configuracoes"
           component={ConfiguracoesScreen}
@@ -295,7 +285,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Calendário */}
+        {}
         <Stack.Screen
           name="Calendario"
           component={CalendarioScreen}
@@ -305,7 +295,7 @@ const Router: React.FC = () => {
           }}
         />
 
-        {/* Dashboard */}
+        {}
         <Stack.Screen
           name="Dashboard"
           component={CardDashboard}
