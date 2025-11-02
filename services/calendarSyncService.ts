@@ -6,8 +6,10 @@ import GoogleCalendarService from './googleCalendarService';
 interface TarefaCalendar {
   id_tarefa: number;
   titulo: string;
+  descricao?: string;
   data_fim: string;
   status: string;
+  prioridade?: string;
   google_calendar_event_id?: string;
 }
 
@@ -252,18 +254,48 @@ class CalendarSyncService {
 
   async initializeAutoSync(): Promise<void> {
     try {
-
-      setTimeout(() => {
-        this.runSync();
+      console.log('🔄 Inicializando sincronização automática com Google Calendar...');
+      
+      // Executar sincronização inicial após 5 segundos
+      setTimeout(async () => {
+        await this.runSync();
+        await this.runDailyCheck();
       }, 5000);
 
-      setInterval(() => {
-        this.runSync();
+      // Executar sincronização a cada 4 horas
+      setInterval(async () => {
+        await this.runSync();
       }, 4 * 60 * 60 * 1000);
 
-      console.log('🔄 Sincronização automática inicializada');
+      // Executar check diário a cada 6 horas (4x por dia)
+      setInterval(async () => {
+        await this.runDailyCheck();
+      }, 6 * 60 * 60 * 1000);
+
+      console.log('✅ Sincronização automática inicializada com sucesso');
     } catch (error) {
-      console.error('Erro ao inicializar sincronização automática:', error);
+      console.error('❌ Erro ao inicializar sincronização automática:', error);
+    }
+  }
+
+  private async runDailyCheck(): Promise<void> {
+    try {
+      console.log('🕐 Executando verificação diária de prazos...');
+      
+      const calendarEnabled = await GoogleCalendarService.isCalendarEnabled();
+      if (!calendarEnabled) {
+        console.log('ℹ️ Google Calendar não habilitado - pulando check diário');
+        return;
+      }
+
+      const tarefas = await this.loadTasksWithDeadlines();
+      console.log(`📝 Verificando ${tarefas.length} tarefas com prazos`);
+      
+      await GoogleCalendarService.dailyDeadlineCheck(tarefas);
+      console.log('✅ Verificação diária concluída');
+      
+    } catch (error) {
+      console.error('❌ Erro no check diário:', error);
     }
   }
 
@@ -279,10 +311,8 @@ class CalendarSyncService {
 
   async syncSingleTask(tarefa: {id: number, titulo: string, descricao?: string, data_fim?: string}): Promise<boolean> {
     try {
-
-      if (!tarefa.data_fim) {
-        return true;
-      }
+      console.log(`🔍 DEBUG: syncSingleTask chamado para tarefa ${tarefa.id}: ${tarefa.titulo}`);
+      console.log(`📅 Data fim: ${tarefa.data_fim || 'não informada'}`);
 
       const registeredEvents = await this.getRegisteredEvents();
 
@@ -291,13 +321,15 @@ class CalendarSyncService {
         return true;
       }
 
-      const success = await GoogleCalendarService.onTaskCreated(tarefa.titulo, tarefa.descricao);
+      console.log(`📞 Chamando GoogleCalendarService.onTaskCreated...`);
+      const success = await GoogleCalendarService.onTaskCreated(tarefa.titulo, tarefa.descricao, tarefa.data_fim);
 
       if (success) {
-
         await this.saveRegisteredEvent(tarefa.id, `event_${tarefa.id}_${Date.now()}`);
-        console.log(`📅 Tarefa ${tarefa.id} sincronizada com Google Calendar`);
+        console.log(`✅ Tarefa ${tarefa.id} sincronizada com Google Calendar`);
         return true;
+      } else {
+        console.log(`❌ Falha na sincronização da tarefa ${tarefa.id}`);
       }
 
       return false;
@@ -309,7 +341,7 @@ class CalendarSyncService {
 
   async updateSingleTask(tarefa: {id: number, titulo: string, descricao?: string, data_fim?: string}): Promise<boolean> {
     try {
-      const success = await GoogleCalendarService.onTaskEdited(tarefa.titulo, tarefa.descricao);
+      const success = await GoogleCalendarService.onTaskEdited(tarefa.titulo, tarefa.descricao, tarefa.data_fim);
       console.log(`📝 Tarefa ${tarefa.id} atualizada no Google Calendar`);
       return success;
     } catch (error) {

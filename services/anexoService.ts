@@ -493,7 +493,7 @@ class AnexoService {
   private async uploadImageDirect(idTarefa: number, formData: FormData): Promise<any> {
     const { getToken } = require('./authService');
     const token = await getToken();
-    const API_BASE = 'http://172.16.102.231:3000'; // Corrigido para usar a mesma URL do authService
+    const API_BASE = 'http://172.16.102.10:3000'; // Corrigido para usar a mesma URL do authService
     
     if (!token) {
       throw new Error('Token não encontrado para upload XHR');
