@@ -18,6 +18,7 @@ import {
   getActiveWorkspaceId,
   getUserEmail,
 } from '../../services/authService';
+import PdfService from '../../services/pdfService';
 
 interface CardDashboardProps {
   navigation: StackNavigationProp<RootStackParamList>;
@@ -41,6 +42,7 @@ interface WorkspaceInfo {
 const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey }) => {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [switchingMode, setSwitchingMode] = useState(false);
   const [metricas, setMetricas] = useState<MetricasData>({
     total: 0,
     concluidas: 0,
@@ -49,8 +51,15 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
     pendentes: 0,
   });
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
-  const [isEquipeView, setIsEquipeView] = useState(false);
+  const [isEquipeView, setIsEquipeView] = useState(false); // Sempre começar no modo Individual
   const [userEmail, setUserEmail] = useState<string>('');
+
+  const handleSwitchChange = async (newValue: boolean) => {
+    setSwitchingMode(true);
+    setIsEquipeView(newValue);
+    // O useEffect vai detectar a mudança e recarregar os dados
+    setTimeout(() => setSwitchingMode(false), 1000); // Reset após 1 segundo
+  };
 
   useEffect(() => {
     carregarDados();
@@ -73,6 +82,27 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
       try {
 
         workspace = await apiCall(`/workspaces/id/${workspaceId}`, 'GET');
+        console.log('📋 Workspace carregado:', JSON.stringify(workspace, null, 2));
+        console.log('📋 Tipo do workspace:', workspace?.tipo);
+        console.log('📋 Outros campos possíveis:', {
+          type: workspace?.type,
+          workspace_type: workspace?.workspace_type,
+          tipoWorkspace: workspace?.tipoWorkspace,
+          categoria: workspace?.categoria
+        });
+        
+        // Corrigir o tipo se vier undefined ou com outro nome
+        if (!workspace.tipo) {
+          workspace.tipo = workspace.type || workspace.workspace_type || workspace.tipoWorkspace || 'equipe'; // assumir equipe por padrão
+          console.log('🔧 Tipo corrigido para:', workspace.tipo);
+        }
+        
+        // Garantir que sempre tenha um tipo definido
+        if (!workspace.tipo) {
+          workspace.tipo = 'equipe'; // Por padrão, assumir equipe se não especificado
+          console.log('🔧 Assumindo workspace como equipe (padrão)');
+        }
+        
         setWorkspaceInfo(workspace);
       } catch (workspaceError) {
         console.error('Erro ao carregar workspace:', workspaceError);
@@ -82,23 +112,51 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
           nome: 'Workspace',
           tipo: 'individual' as 'individual' | 'equipe'
         };
+        console.log('⚠️ Usando workspace padrão (erro na API):', workspace);
         setWorkspaceInfo(workspace);
       }
 
       try {
-
         let tarefas;
-        if (!isEquipeView && workspace?.tipo === 'equipe') {
+        
+        console.log('🔍 Carregando tarefas:', {
+          workspaceId,
+          workspaceType: workspace?.tipo,
+          isEquipeView,
+          userEmail: email
+        });
 
-          try {
-            tarefas = await apiCall(`/tarefas/workspace/${workspaceId}/filtros-avancados?minhas_tarefas=true`, 'GET');
-          } catch (filtroError) {
-            console.log('Filtros avançados não disponíveis, usando endpoint simples');
-
+        if (workspace?.tipo === 'equipe' || (workspace && !workspace.tipo)) {
+          if (isEquipeView) {
+            // Visualização de EQUIPE: todas as tarefas do workspace
+            console.log('📊 Modo EQUIPE: carregando todas as tarefas do workspace');
             tarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
+          } else {
+            // Visualização INDIVIDUAL: apenas tarefas do usuário logado
+            console.log('👤 Modo INDIVIDUAL: carregando apenas minhas tarefas');
+            try {
+              // Tentar endpoint específico para usuário
+              tarefas = await apiCall(`/tarefas/workspace/${workspaceId}/usuario/${email}`, 'GET');
+            } catch (filtroError) {
+              console.log('⚠️ Endpoint específico falhou, tentando filtros avançados...');
+              try {
+                tarefas = await apiCall(`/tarefas/workspace/${workspaceId}/filtros-avancados?minhas_tarefas=true`, 'GET');
+              } catch (filtroError2) {
+                console.log('⚠️ Filtros avançados falharam, usando filtro manual...');
+                // Fallback: carregar todas e filtrar no frontend
+                const todasTarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
+                tarefas = todasTarefas.filter((tarefa: any) => 
+                  tarefa.criado_por === email || 
+                  tarefa.usuario_criador === email ||
+                  tarefa.email_criador === email
+                );
+                console.log(`🔧 Filtro manual aplicado: ${todasTarefas.length} → ${tarefas.length} tarefas`);
+              }
+            }
           }
         } else {
-
+          // Workspace individual: sempre mostrar todas as tarefas (já são do usuário)
+          console.log('📝 Workspace individual: carregando todas as tarefas');
           tarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
         }
 
@@ -149,27 +207,46 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
     setMetricas(metricsData);
   };
 
-  const exportarPDF = () => {
-    Alert.alert(
-      'Exportar PDF',
-      `Tarefas Totais: ${metricas.total}\nConcluídas: ${metricas.concluidas}\nAtrasadas: ${metricas.atrasadas}\nEm Andamento: ${metricas.emAndamento}\nPendentes: ${metricas.pendentes}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Baixar PDF', onPress: () => {
+  const exportarPDF = async () => {
+    try {
+      // Verificar disponibilidade do serviço
+      const disponivel = await PdfService.verificarDisponibilidade();
+      
+      if (!disponivel) {
+        Alert.alert('Erro', 'Serviço de relatório não está disponível no momento.');
+        return;
+      }
 
-          Alert.alert('PDF', 'Funcionalidade de PDF será implementada em breve!');
-        }}
-      ]
-    );
+      // Gerar relatório HTML e salvar
+      Alert.alert(
+        'Gerar Relatório',
+        'Deseja gerar um relatório HTML das métricas? O arquivo será salvo na pasta Downloads.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Baixar Relatório', 
+            onPress: async () => {
+              const sucesso = await PdfService.gerarRelatorioPDF(
+                metricas, 
+                workspaceInfo, 
+                isEquipeView, 
+                userEmail
+              );
+              if (!sucesso) {
+                Alert.alert('Erro', 'Não foi possível gerar o relatório.');
+              }
+            }
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('❌ Erro ao exportar relatório:', error);
+      Alert.alert('Erro', 'Não foi possível gerar o relatório. Tente novamente.');
+    }
   };
 
-  const renderMetricaCard = (titulo: string, valor: number, cor: string, icone: string) => (
-    <View style={[styles.metricaCard, { backgroundColor: theme.colors.surface }]}>
-      <Text style={styles.metricaIcone}>{icone}</Text>
-      <Text style={[styles.metricaValor, { color: cor }]}>{valor}</Text>
-      <Text style={[styles.metricaTitulo, { color: theme.colors.textSecondary }]}>{titulo}</Text>
-    </View>
-  );
+
 
   if (loading) {
     return (
@@ -190,46 +267,59 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
         {}
         <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.headerContent}>
-            <Text style={[styles.title, { color: theme.colors.text }]}>
-              📊 Dashboard
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, { color: theme.colors.text }]}>
+                📊 Métricas
+              </Text>
+              
+              {(workspaceInfo?.tipo === 'equipe' || (workspaceInfo && !workspaceInfo.tipo)) && (
+                <View style={styles.switchContainer}>
+                  <Text style={[styles.switchLabel, { 
+                    color: !isEquipeView ? theme.colors.primary : theme.colors.textSecondary,
+                    fontWeight: !isEquipeView ? 'bold' : 'normal'
+                  }]}>
+                    Individual
+                  </Text>
+                  <Switch
+                    value={isEquipeView}
+                    onValueChange={handleSwitchChange}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={isEquipeView ? theme.colors.background : theme.colors.textSecondary}
+                    disabled={switchingMode}
+                  />
+                  <Text style={[styles.switchLabel, { 
+                    color: isEquipeView ? theme.colors.primary : theme.colors.textSecondary,
+                    fontWeight: isEquipeView ? 'bold' : 'normal'
+                  }]}>
+                    Equipe
+                  </Text>
+                  {switchingMode && (
+                    <ActivityIndicator 
+                      size="small" 
+                      color={theme.colors.primary} 
+                      style={{ marginLeft: 8 }}
+                    />
+                  )}
+                </View>
+              )}
+            </View>
+            
             <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
               {workspaceInfo?.nome || 'Workspace'}
+              {(workspaceInfo?.tipo === 'equipe' || (workspaceInfo && !workspaceInfo.tipo)) && (
+                <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>
+                  {' '}• {isEquipeView ? 'Equipe' : 'Individual'}
+                </Text>
+              )}
             </Text>
           </View>
-
-          {}
-          {workspaceInfo?.tipo === 'equipe' && (
-            <View style={styles.switchContainer}>
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>
-                Individual
-              </Text>
-              <Switch
-                value={isEquipeView}
-                onValueChange={setIsEquipeView}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={isEquipeView ? theme.colors.background : theme.colors.textSecondary}
-              />
-              <Text style={[styles.switchLabel, { color: theme.colors.textSecondary }]}>
-                Equipe
-              </Text>
-            </View>
-          )}
 
           {}
           <TouchableOpacity
             style={[styles.exportButton, { backgroundColor: theme.colors.primary }]}
             onPress={exportarPDF}>
-            <Text style={styles.exportButtonText}>📄 PDF</Text>
+            <Text style={styles.exportButtonText}>📊 Relatório</Text>
           </TouchableOpacity>
-        </View>
-
-        {}
-        <View style={styles.metricsContainer}>
-          {renderMetricaCard('Total', metricas.total, theme.colors.text, '📝')}
-          {renderMetricaCard('Concluídas', metricas.concluidas, theme.colors.success, '✅')}
-          {renderMetricaCard('Em Andamento', metricas.emAndamento, theme.colors.info, '🔄')}
-          {renderMetricaCard('Atrasadas', metricas.atrasadas, theme.colors.error, '⚠️')}
         </View>
 
         {}
@@ -239,10 +329,7 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
             tarefasConcluidas: metricas.concluidas,
             tarefasEmAndamento: metricas.emAndamento,
             tarefasPendentes: metricas.pendentes,
-            produtividadeSemanal: [4, 6, 5, 8, 3],
-            ultimasSemanasLabels: ['S1', 'S2', 'S3', 'S4', 'S5'],
           }}
-          title="Métricas do Projeto"
           isEquipe={isEquipeView}
         />
       </ScrollView>
@@ -279,6 +366,12 @@ const styles = StyleSheet.create({
   headerContent: {
     marginBottom: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -291,12 +384,10 @@ const styles = StyleSheet.create({
   switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
     gap: 8,
   },
   switchLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   exportButton: {
@@ -310,39 +401,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  metricsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  metricaCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  metricaIcone: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  metricaValor: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  metricaTitulo: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+
 });
 
 export default CardDashboard;

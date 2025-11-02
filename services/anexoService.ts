@@ -360,7 +360,13 @@ class AnexoService {
       let response;
       if (tipo === 'imagem') {
         console.log('🖼️ Upload de imagem - usando fetch direto');
-        response = await this.uploadImageDirect(idTarefa, formData);
+        try {
+          response = await this.uploadImageDirect(idTarefa, formData);
+        } catch (xhrError) {
+          console.log('⚠️ XHR falhou, tentando com fetch...');
+          // Fallback: usar apiCall normal
+          response = await apiCall(`/tarefa/${idTarefa}/anexo`, 'POST', formData);
+        }
       } else {
         response = await apiCall(`/tarefa/${idTarefa}/anexo`, 'POST', formData);
       }
@@ -487,10 +493,27 @@ class AnexoService {
   private async uploadImageDirect(idTarefa: number, formData: FormData): Promise<any> {
     const { getToken } = require('./authService');
     const token = await getToken();
-    const API_BASE = 'http://10.250.160.119:3000'; // TODO: centralizar essa URL
+    const API_BASE = 'http://172.16.102.231:3000'; // Corrigido para usar a mesma URL do authService
+    
+    if (!token) {
+      throw new Error('Token não encontrado para upload XHR');
+    }
     
     console.log('🌐 Fazendo upload direto via XHR para:', `${API_BASE}/tarefa/${idTarefa}/anexo`);
     console.log('🔑 Token disponível:', !!token);
+    console.log('📊 Tamanho do FormData:', formData instanceof FormData ? 'FormData válido' : 'FormData inválido');
+    
+    // Teste de conectividade simples antes do upload
+    try {
+      console.log('🏓 Testando conectividade...');
+      const testResponse = await Promise.race([
+        fetch(`${API_BASE}/health`, { method: 'GET' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      ]) as Response;
+      console.log('✅ Conectividade OK:', testResponse.status);
+    } catch (connectError) {
+      console.log('⚠️ Teste de conectividade falhou, continuando...');
+    }
     
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -522,11 +545,19 @@ class AnexoService {
       };
       
       xhr.ontimeout = () => {
-        console.error('❌ Timeout no XHR');
+        console.error('❌ Timeout no XHR após', xhr.timeout / 1000, 'segundos');
         reject(new Error('Timeout no upload - arquivo muito grande ou conexão lenta'));
       };
       
-      xhr.timeout = 60000; // 60 segundos para imagens
+      // Monitorar progresso do upload
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          console.log(`📊 Upload: ${percentComplete.toFixed(1)}% (${e.loaded}/${e.total} bytes)`);
+        }
+      };
+      
+      xhr.timeout = 120000; // 2 minutos para imagens (era 1 minuto)
       
       console.log('📤 Enviando FormData via XHR...');
       xhr.send(formData);

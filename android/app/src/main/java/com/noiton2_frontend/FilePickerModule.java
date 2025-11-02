@@ -173,6 +173,49 @@ public class FilePickerModule extends ReactContextBaseJavaModule implements Acti
         }
     }
 
+    @ReactMethod
+    public void saveTextToFile(String content, String fileName, Promise promise) {
+        android.util.Log.d("FilePickerModule", "Salvando arquivo: " + fileName);
+        
+        try {
+            Context context = getReactApplicationContext();
+            
+            // Criar arquivo na pasta Downloads
+            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            if (!downloadsDir.exists()) {
+                downloadsDir.mkdirs();
+            }
+            
+            File file = new File(downloadsDir, fileName);
+            
+            // Escrever conteúdo no arquivo
+            FileOutputStream fos = new FileOutputStream(file);
+            fos.write(content.getBytes("UTF-8"));
+            fos.close();
+            
+            android.util.Log.d("FilePickerModule", "Arquivo salvo em: " + file.getAbsolutePath());
+            
+            // Mostrar toast para o usuário
+            Activity activity = getCurrentActivity();
+            if (activity != null) {
+                activity.runOnUiThread(() -> {
+                    Toast.makeText(context, "Arquivo salvo: " + fileName, Toast.LENGTH_SHORT).show();
+                });
+            }
+            
+            // Retornar sucesso
+            WritableMap result = Arguments.createMap();
+            result.putString("status", "saved");
+            result.putString("filePath", file.getAbsolutePath());
+            result.putString("fileName", fileName);
+            promise.resolve(result);
+            
+        } catch (Exception e) {
+            android.util.Log.e("FilePickerModule", "Erro ao salvar arquivo: " + e.getMessage());
+            promise.reject("SAVE_ERROR", "Erro ao salvar arquivo: " + e.getMessage());
+        }
+    }
+
     @Override
     public void onActivityResult(Activity activity, int requestCode, int resultCode, @Nullable Intent data) {
         if (requestCode == FILE_PICKER_REQUEST_CODE && pickerPromise != null) {

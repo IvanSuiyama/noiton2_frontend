@@ -300,7 +300,7 @@ const Router: React.FC = () => {
           name="Dashboard"
           component={CardDashboard}
           options={{
-            title: 'Dashboard',
+            title: 'Métricas',
             headerBackTitleVisible: false,
           }}
         />
