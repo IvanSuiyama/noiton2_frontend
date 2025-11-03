@@ -99,16 +99,10 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
           console.log('🏢 Buscando informações do workspace:', id);
           const workspaceInfo = await apiCall(`/workspaces/id/${id}`, 'GET');
           console.log('🏢 Workspace info recebido:', workspaceInfo);
-          setWorkspaceEquipe(workspaceInfo.tipo === 'equipe');
+          // Usar o campo 'equipe' (boolean) da interface WorkspaceInterface
+          setWorkspaceEquipe(workspaceInfo.equipe || false);
         } catch (error) {
           console.log('❌ Erro ao buscar info do workspace:', error);
-          console.log('❌ Tipo do erro:', typeof error);
-          console.log('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
-
-          if (error instanceof SyntaxError && error.message.includes('JSON')) {
-            console.log('🚨 API retornou HTML ao invés de JSON - provavelmente endpoint não existe');
-          }
-
           setWorkspaceEquipe(false);
         }
       }
@@ -518,7 +512,8 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
         </View>
 
         {}
-        {workspaceEquipe && (
+                {/* Botão de permissões - aparece para criador da tarefa ou em workspaces de equipe */}
+        {(tarefa.nivel_acesso === 0 || workspaceEquipe) && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={styles.permissaoButton}
