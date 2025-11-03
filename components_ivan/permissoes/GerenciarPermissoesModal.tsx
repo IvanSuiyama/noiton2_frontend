@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { apiCall } from '../../services/authService';
+import { apiCall, getUserEmail } from '../../services/authService';
 
 interface Usuario {
   id_usuario: number;
@@ -74,12 +74,26 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
     try {
       setLoading(true);
 
-      const usuariosWorkspace = await apiCall(`/workspaces/${idWorkspace}/usuarios`, 'GET');
+      // Obter email do usuário logado (criador da tarefa)
+      const emailCriador = await getUserEmail();
+
+      // Obter informações do workspace para pegar a lista de usuários
+      const workspaceInfo = await apiCall(`/workspaces/id/${idWorkspace}`, 'GET');
+      
+      // Filtrar emails para remover o criador da tarefa e converter para formato esperado
+      const emailsFiltrados = (workspaceInfo.emails || []).filter((email: string) => 
+        email !== emailCriador
+      );
+
+      const usuariosWorkspace = emailsFiltrados.map((email: string) => ({
+        email: email,
+        nome: email.split('@')[0] // usar parte antes do @ como nome temporário
+      }));
 
       const permissoesData: PermissaoCompleta = {
         id_tarefa: idTarefa,
         permissoes_atuais: [],
-        usuarios_disponiveis: usuariosWorkspace || [],
+        usuarios_disponiveis: usuariosWorkspace,
         pode_gerenciar: true
       };
 
@@ -138,11 +152,11 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
   };
 
   const renderUsuarioPermissao = ({ item }: { item: Usuario }) => (
-    <View style={styles.usuarioItem}>
+    <View style={[styles.usuarioItem, { backgroundColor: theme.colors.surface }]}>
       <View style={styles.usuarioInfo}>
-        <Text style={styles.usuarioNome}>{item.nome}</Text>
-        <Text style={styles.usuarioEmail}>{item.email}</Text>
-        <Text style={styles.usuarioNivel}>
+        <Text style={[styles.usuarioNome, { color: theme.colors.text }]}>{item.nome}</Text>
+        <Text style={[styles.usuarioEmail, { color: theme.colors.textSecondary }]}>{item.email}</Text>
+        <Text style={[styles.usuarioNivel, { color: theme.colors.primary }]}>
           {nivelLabels[item.nivel_acesso!]} - {nivelDescricoes[item.nivel_acesso!]}
         </Text>
       </View>
@@ -178,9 +192,9 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
     return (
       <Modal visible={visible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <ActivityIndicator size="large" color="#007bff" />
-            <Text style={styles.loadingText}>Carregando...</Text>
+          <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Carregando...</Text>
           </View>
         </View>
       </Modal>
@@ -200,14 +214,15 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
                   key={usuario.id_usuario}
                   style={[
                     styles.selectorItem,
+                    { backgroundColor: theme.colors.surface },
                     usuarioSelecionado?.id_usuario === usuario.id_usuario && styles.selectorItemSelected
                   ]}
                   onPress={() => {
                     setUsuarioSelecionado(usuario);
                     setShowUsuarioSelector(false);
                   }}>
-                  <Text style={styles.selectorItemText}>{usuario.nome}</Text>
-                  <Text style={styles.selectorItemEmail}>{usuario.email}</Text>
+                  <Text style={[styles.selectorItemText, { color: theme.colors.text }]}>{usuario.nome}</Text>
+                  <Text style={[styles.selectorItemEmail, { color: theme.colors.textSecondary }]}>{usuario.email}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -223,33 +238,35 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
       {}
       <Modal visible={showNivelSelector} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.selectorModal}>
-            <Text style={styles.selectorModalTitle}>Selecionar Nível</Text>
+          <View style={[styles.selectorModal, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.selectorModalTitle, { color: theme.colors.text }]}>Selecionar Nível</Text>
             <View style={styles.selectorList}>
               <TouchableOpacity
                 style={[
                   styles.selectorItem,
+                  { backgroundColor: theme.colors.surface },
                   nivelSelecionado === 1 && styles.selectorItemSelected
                 ]}
                 onPress={() => {
                   setNivelSelecionado(1);
                   setShowNivelSelector(false);
                 }}>
-                <Text style={styles.selectorItemText}>Editor</Text>
-                <Text style={styles.selectorItemEmail}>Pode ver e editar</Text>
+                <Text style={[styles.selectorItemText, { color: theme.colors.text }]}>Editor</Text>
+                <Text style={[styles.selectorItemEmail, { color: theme.colors.textSecondary }]}>Pode ver e editar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.selectorItem,
+                  { backgroundColor: theme.colors.surface },
                   nivelSelecionado === 2 && styles.selectorItemSelected
                 ]}
                 onPress={() => {
                   setNivelSelecionado(2);
                   setShowNivelSelector(false);
                 }}>
-                <Text style={styles.selectorItemText}>Visualizador</Text>
-                <Text style={styles.selectorItemEmail}>Pode apenas ver</Text>
+                <Text style={[styles.selectorItemText, { color: theme.colors.text }]}>Visualizador</Text>
+                <Text style={[styles.selectorItemEmail, { color: theme.colors.textSecondary }]}>Pode apenas ver</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -273,44 +290,53 @@ const GerenciarPermissoesModal: React.FC<GerenciarPermissoesModalProps> = ({
             {}
             {permissoes?.usuarios_disponiveis && permissoes.usuarios_disponiveis.length > 0 && (
               <View style={styles.secao}>
-                <Text style={styles.secaoTitulo}>Adicionar Usuário</Text>
+                <Text style={[styles.secaoTitulo, { color: theme.colors.text }]}>Adicionar Usuário</Text>
 
-                <View style={styles.adicionarContainer}>
+                <View style={[styles.adicionarContainer, { backgroundColor: theme.colors.background }]}>
                   <View style={styles.selectorContainer}>
-                    <Text style={styles.selectorLabel}>Usuário:</Text>
+                    <Text style={[styles.selectorLabel, { color: theme.colors.textSecondary }]}>Usuário:</Text>
                     <TouchableOpacity
-                      style={styles.selectorButton}
+                      style={[styles.selectorButton, { 
+                        backgroundColor: theme.colors.surface, 
+                        borderColor: theme.colors.border 
+                      }]}
                       onPress={() => setShowUsuarioSelector(true)}>
-                      <Text style={styles.selectorText}>
+                      <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                         {usuarioSelecionado
                           ? `${usuarioSelecionado.nome} (${usuarioSelecionado.email})`
                           : 'Selecione um usuário...'
                         }
                       </Text>
-                      <Text style={styles.selectorArrow}>▼</Text>
+                      <Text style={[styles.selectorArrow, { color: theme.colors.textSecondary }]}>▼</Text>
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.selectorContainer}>
-                    <Text style={styles.selectorLabel}>Nível de Acesso:</Text>
+                    <Text style={[styles.selectorLabel, { color: theme.colors.textSecondary }]}>Nível de Acesso:</Text>
                     <TouchableOpacity
-                      style={styles.selectorButton}
+                      style={[styles.selectorButton, { 
+                        backgroundColor: theme.colors.surface, 
+                        borderColor: theme.colors.border 
+                      }]}
                       onPress={() => setShowNivelSelector(true)}>
-                      <Text style={styles.selectorText}>
+                      <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                         {nivelSelecionado === 1
                           ? 'Editor - Pode ver e editar'
                           : 'Visualizador - Pode apenas ver'
                         }
                       </Text>
-                      <Text style={styles.selectorArrow}>▼</Text>
+                      <Text style={[styles.selectorArrow, { color: theme.colors.textSecondary }]}>▼</Text>
                     </TouchableOpacity>
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.botaoAdicionar, !usuarioSelecionado && styles.botaoDesabilitado]}
+                    style={[
+                      styles.botaoAdicionar, 
+                      { backgroundColor: usuarioSelecionado ? theme.colors.primary : theme.colors.secondary }
+                    ]}
                     onPress={adicionarPermissao}
                     disabled={!usuarioSelecionado}>
-                    <Text style={styles.textoBotaoAdicionar}>Adicionar Permissão</Text>
+                    <Text style={[styles.textoBotaoAdicionar, { color: '#fff' }]}>Adicionar Permissão</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -337,7 +363,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
     width: '90%',
@@ -350,12 +375,10 @@ const styles = StyleSheet.create({
   titulo: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
   },
   subtitulo: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
   },
   secao: {
@@ -364,14 +387,12 @@ const styles = StyleSheet.create({
   secaoTitulo: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 12,
   },
   lista: {
     maxHeight: 200,
   },
   usuarioItem: {
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
@@ -386,12 +407,10 @@ const styles = StyleSheet.create({
   usuarioNome: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 2,
   },
   usuarioEmail: {
     fontSize: 12,
-    color: '#666',
     marginBottom: 4,
   },
   usuarioNivel: {
@@ -428,7 +447,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   adicionarContainer: {
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     padding: 12,
   },
@@ -442,10 +460,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   selectorButton: {
-    backgroundColor: '#fff',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: 'row',
@@ -454,12 +470,10 @@ const styles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 14,
-    color: '#333',
     flex: 1,
   },
   selectorArrow: {
     fontSize: 12,
-    color: '#666',
     marginLeft: 8,
   },
   botaoAdicionar: {
@@ -495,12 +509,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
   },
 
   selectorModal: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
     width: '80%',
@@ -509,7 +521,6 @@ const styles = StyleSheet.create({
   selectorModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -517,7 +528,6 @@ const styles = StyleSheet.create({
     maxHeight: 300,
   },
   selectorItem: {
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
@@ -525,18 +535,15 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectorItemSelected: {
-    backgroundColor: '#e3f2fd',
     borderColor: '#007bff',
   },
   selectorItemText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 2,
   },
   selectorItemEmail: {
     fontSize: 12,
-    color: '#666',
   },
   selectorCancelButton: {
     backgroundColor: '#6c757d',
