@@ -20,6 +20,7 @@ import {CriarTarefaInterface} from './tarefaMultiplaInterface';
 import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getUserEmail, getUserId, getActiveWorkspaceId} from '../../services/authService';
 import CalendarSyncService from '../../services/calendarSyncService';
+import { useNotifications } from '../../hooks/useNotifications';
 
 // Tipo baseado na CriarTarefaInterface
 type FormData = CriarTarefaInterface;
@@ -47,6 +48,7 @@ const FREQUENCIAS = [
 
 const CadTarefa: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const { notifyTaskCreated } = useNotifications();
   const [formData, setFormData] = useState<FormData>({
     titulo: '',
     descricao: '',
@@ -201,6 +203,22 @@ const CadTarefa: React.FC = () => {
       } catch (calendarError) {
         console.log('Erro ao registrar tarefa no calendário:', calendarError);
         // Não interromper o fluxo se houver erro no calendário
+      }
+
+      // Notificação push para tarefa criada
+      try {
+        await notifyTaskCreated({
+          id_tarefa: tarefaCriada.id_tarefa,
+          titulo: formData.titulo,
+          descricao: formData.descricao,
+          data_fim: formData.data_fim,
+          status: formData.status,
+          prioridade: formData.prioridade
+        });
+        console.log('📋 Notificação de tarefa criada enviada');
+      } catch (notificationError) {
+        console.log('Erro ao enviar notificação:', notificationError);
+        // Não interromper o fluxo se houver erro na notificação
       }
 
       Alert.alert('Sucesso', 'Tarefa cadastrada com sucesso!', [

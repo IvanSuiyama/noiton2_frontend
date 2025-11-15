@@ -16,6 +16,7 @@ import {login, setupActiveWorkspace} from '../../services/authService';
 import FirstTimePopup from '../popup/FirstTimePopup';
 import GoogleCalendarService from '../../services/googleCalendarService';
 import AnexoService from '../../services/anexoService';
+import { useNotifications } from '../../hooks/useNotifications';
 
 type LoginScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -27,6 +28,7 @@ type Props = {
 };
 
 const LoginScreen: React.FC<Props> = ({navigation}) => {
+  const { checkPermission, requestPermission, permissionStatus } = useNotifications();
   const [formData, setFormData] = useState({
     email: '',
     senha: '',
@@ -130,6 +132,31 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                 await AnexoService.requestPermissionsWithUserFeedback();
               }, 1500);
             }
+
+            // Solicitar permissão de notificação
+            setTimeout(async () => {
+              await checkPermission();
+              if (!permissionStatus?.enabled) {
+                Alert.alert(
+                  '🔔 Permissão de Notificações',
+                  'Para receber lembretes sobre suas tarefas (prazos próximos, novas tarefas criadas), precisamos de permissão para enviar notificações.\n\nDeseja ativar as notificações?',
+                  [
+                    {
+                      text: 'Agora não',
+                      style: 'cancel',
+                      onPress: () => console.log('ℹ️ Usuário optou por não ativar notificações')
+                    },
+                    {
+                      text: 'Ativar',
+                      onPress: async () => {
+                        await requestPermission();
+                        console.log('🔔 Configurações de notificação abertas');
+                      }
+                    }
+                  ]
+                );
+              }
+            }, 2000); // Delay para não sobrecarregar o usuário com muitos dialogs
           } catch (error) {
             console.log('Usuário optou por não conceder algumas permissões');
           }

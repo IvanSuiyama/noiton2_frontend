@@ -27,6 +27,7 @@ public class MainApplication extends Application implements ReactApplication {
           // packages.add(new MyReactNativePackage());
           packages.add(new CalendarPackage());
           packages.add(new FilePickerPackage());
+          packages.add(new NotificationPackage());
           return packages;
         }
 

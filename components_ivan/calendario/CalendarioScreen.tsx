@@ -15,6 +15,7 @@ import {
   getActiveWorkspaceId,
 } from '../../services/authService';
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
+import NotificationService from '../../services/notificationService';
 
 interface CalendarioScreenProps {
   navigation: StackNavigationProp<RootStackParamList>;

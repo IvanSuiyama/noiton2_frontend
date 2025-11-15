@@ -16,6 +16,7 @@ import {
 } from '../../services/authService';
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
 import { useTheme } from '../theme/ThemeContext';
+import { useNotifications } from '../../hooks/useNotifications';
 
 
 interface HomeCardProps {
@@ -24,6 +25,7 @@ interface HomeCardProps {
 
 const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
   const { theme } = useTheme();
+  const { checkUpcomingTasks, permissionStatus } = useNotifications();
   const [tarefasRecentes, setTarefasRecentes] = useState<TarefaMultiplaInterface[]>([]);
   const [tarefasUrgentes, setTarefasUrgentes] = useState<TarefaMultiplaInterface[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,6 +124,27 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
         .slice(0, 3);
       
       setTarefasUrgentes(tarefasPertoDeVencer);
+
+      // Enviar notificações para tarefas próximas do vencimento
+      if (permissionStatus?.enabled && tarefasPertoDeVencer.length > 0) {
+        const tarefasParaNotificacao = tarefasPertoDeVencer.map((tarefa: TarefaMultiplaInterface) => ({
+          id_tarefa: tarefa.id_tarefa,
+          titulo: tarefa.titulo,
+          descricao: tarefa.descricao,
+          data_fim: tarefa.data_fim,
+          status: tarefa.status,
+          prioridade: tarefa.prioridade
+        }));
+        
+        // Usar a função que verifica e envia notificações
+        await checkUpcomingTasks(tarefasParaNotificacao);
+        console.log(`🔔 Verificação de notificações para ${tarefasPertoDeVencer.length} tarefas próximas do vencimento`);
+        
+        // Teste simples de notificação - apenas para debug
+        if (tarefasPertoDeVencer.length > 0) {
+          console.log('🔔 TESTE: Enviando notificação de teste para verificar funcionamento');
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar tarefas perto de vencer:', error);
     }

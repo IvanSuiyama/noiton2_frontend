@@ -20,6 +20,7 @@ import CategoriaInterface from '../categoria/categoriaInterface';
 import {apiCall, getActiveWorkspaceId} from '../../services/authService';
 import CalendarSyncService from '../../services/calendarSyncService';
 import AnexoService, {AnexoTarefa} from '../../services/anexoService';
+import { useNotifications } from '../../hooks/useNotifications';
 
 type EditTarefaNavigationProp = StackNavigationProp<RootStackParamList>;
 type EditTarefaRouteProp = RouteProp<RootStackParamList, 'EditTarefa'>;
@@ -65,6 +66,7 @@ const FREQUENCIAS = [
 
 const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
   const {id_tarefa} = route.params;
+  const { showNotification } = useNotifications();
   
   const [formData, setFormData] = useState<TarefaData>({
     id_tarefa: 0,
@@ -405,6 +407,18 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
       } catch (calendarError) {
         console.log('Erro ao atualizar eventos no calendário:', calendarError);
         // Não interromper o fluxo se houver erro no calendário
+      }
+
+      // Notificação push para tarefa editada
+      try {
+        await showNotification(
+          '✏️ Tarefa Atualizada',
+          `A tarefa "${formData.titulo}" foi atualizada com sucesso!`
+        );
+        console.log('📋 Notificação de tarefa atualizada enviada');
+      } catch (notificationError) {
+        console.log('Erro ao enviar notificação:', notificationError);
+        // Não interromper o fluxo se houver erro na notificação
       }
 
       Alert.alert('Sucesso', 'Tarefa atualizada com sucesso!', [

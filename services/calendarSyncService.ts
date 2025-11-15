@@ -102,7 +102,11 @@ class CalendarSyncService {
         tarefa.status !== 'concluido'
       );
     } catch (error) {
-      console.error('Erro ao carregar tarefas:', error);
+      // Silenciar erro de token expirado para não poluir logs
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      if (!errorMessage.includes('Token expirado')) {
+        console.error('Erro ao carregar tarefas:', error);
+      }
       return [];
     }
   }
