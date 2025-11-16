@@ -35,10 +35,17 @@ export type RootStackParamList = {
 
   Welcome: undefined;
   Login: undefined;
+  GoogleSignIn: undefined;
 
   Home: undefined;
 
-  CadastroUsuario: undefined;
+  CadastroUsuario: {
+    googleData?: {
+      nome: string;
+      email: string;
+      isFromGoogle: boolean;
+    };
+  } | undefined;
   EditUsuario: { userEmail: string };
   SelectUsuario: {
     onSelectUser?: (user: any) => void;
@@ -125,8 +132,6 @@ const Router: React.FC = () => {
         />
 
         {}
-
-        {}
         <Stack.Screen
           name="Home"
           component={HomeScreen}
@@ -134,8 +139,6 @@ const Router: React.FC = () => {
             headerShown: false,
           }}
         />
-
-        {}
 
         {}
         <Stack.Screen

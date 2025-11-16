@@ -440,7 +440,7 @@ class AnexoService {
       }
       
       // Construir URL de download
-      const baseUrl = 'http://seu-servidor.com'; // TODO: Ajustar para sua URL da API
+      const baseUrl = 'http://192.168.15.14:3000';
       const downloadUrl = `${baseUrl}/anexo/${idAnexo}/download`;
       
       // TODO: Obter token de autenticação do AsyncStorage ou contexto

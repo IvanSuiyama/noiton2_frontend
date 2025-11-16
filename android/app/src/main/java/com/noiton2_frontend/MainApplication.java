@@ -28,6 +28,7 @@ public class MainApplication extends Application implements ReactApplication {
           packages.add(new CalendarPackage());
           packages.add(new FilePickerPackage());
           packages.add(new NotificationPackage());
+          packages.add(new GoogleSignInPackage());
           return packages;
         }
 

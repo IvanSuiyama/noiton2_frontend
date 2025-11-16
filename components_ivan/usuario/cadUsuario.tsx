@@ -10,29 +10,41 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {StackNavigationProp} from '@react-navigation/stack';
+import {RouteProp} from '@react-navigation/native';
 import {RootStackParamList} from '../router';
 import UserInterface from './userInterface';
+import { login } from '../../services/authService';
+import FirstTimePopup from '../popup/FirstTimePopup';
 
 type CadUsuarioNavigationProp = StackNavigationProp<
   RootStackParamList,
   'CadastroUsuario'
 >;
 
+type CadUsuarioRouteProp = RouteProp<RootStackParamList, 'CadastroUsuario'>;
+
 type Props = {
   navigation: CadUsuarioNavigationProp;
+  route: CadUsuarioRouteProp;
 };
 
 // Tipo baseado na UserInterface, omitindo id_usuario que é gerado no backend
 type FormData = Omit<UserInterface, 'id_usuario'>;
 
-const CadUsuario: React.FC<Props> = ({navigation}) => {
+const CadUsuario: React.FC<Props> = ({navigation, route}) => {
+  // Dados do Google (se vier do Google Sign-In)
+  const googleData = route.params?.googleData;
+  
   const [formData, setFormData] = useState<FormData>({
-    nome: '',
-    email: '',
+    nome: googleData?.nome || '',
+    email: googleData?.email || '',
     senha: '',
     telefone: '',
   });
+  
+  const [showFirstTimePopup, setShowFirstTimePopup] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<Partial<FormData>>({});
 
@@ -77,19 +89,37 @@ const CadUsuario: React.FC<Props> = ({navigation}) => {
           email: formData.email,
           senha: formData.senha,
           telefone: formData.telefone || null,
+          // Indicar se os dados vêm do Google Sign-In
+          ...(googleData && { fonte: 'google' }),
         }),
       });
 
       if (response.ok) {
-        Alert.alert('Sucesso', 'Usuário cadastrado com sucesso!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Redirecionar para a tela de login
-              navigation.navigate('Login');
+        const responseData = await response.json();
+        
+        // Se o usuário veio do Google Sign-In, mostrar popup de primeiro acesso
+        if (googleData) {
+          Alert.alert('Bem-vindo!', 'Cadastro realizado com sucesso! Vamos configurar seu primeiro workspace.', [
+            {
+              text: 'Continuar',
+              onPress: () => {
+                // Mostrar popup de primeiro acesso
+                setShowFirstTimePopup(true);
+              },
             },
-          },
-        ]);
+          ]);
+        } else {
+          // Cadastro normal (sem Google) - ir para login
+          Alert.alert('Sucesso', 'Usuário cadastrado com sucesso!', [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Redirecionar para a tela de login
+                navigation.navigate('Login');
+              },
+            },
+          ]);
+        }
       } else {
         const errorData = await response.json();
         Alert.alert('Erro', errorData.error || 'Erro ao cadastrar usuário');
@@ -111,6 +141,17 @@ const CadUsuario: React.FC<Props> = ({navigation}) => {
     }
   };
 
+  // Funções do popup de primeiro acesso
+  const handleCreateWorkspace = () => {
+    setShowFirstTimePopup(false);
+    navigation.navigate('CadastroWorkspace');
+  };
+
+  const handleCloseFirstTime = () => {
+    setShowFirstTimePopup(false);
+    navigation.navigate('Home');
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -119,7 +160,18 @@ const CadUsuario: React.FC<Props> = ({navigation}) => {
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled">
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Cadastro de Usuário</Text>
+          <Text style={styles.title}>
+            {googleData?.isFromGoogle ? 'Completar Cadastro' : 'Cadastro de Usuário'}
+          </Text>
+          
+          {googleData?.isFromGoogle && (
+            <View style={styles.googleInfoContainer}>
+              <Text style={styles.googleInfoText}>
+                🔍 Dados obtidos do Google Sign-In{'\n'}
+                Complete as informações abaixo para finalizar seu cadastro
+              </Text>
+            </View>
+          )}
 
           {/* Campo Nome */}
           <View style={styles.inputContainer}>
@@ -201,6 +253,13 @@ const CadUsuario: React.FC<Props> = ({navigation}) => {
           <Text style={styles.requiredText}>* Campos obrigatórios</Text>
         </View>
       </ScrollView>
+      
+      {/* Popup de primeiro acesso */}
+      <FirstTimePopup
+        visible={showFirstTimePopup}
+        onCreateWorkspace={handleCreateWorkspace}
+        onClose={handleCloseFirstTime}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -291,6 +350,20 @@ const styles = StyleSheet.create({
     color: '#b0b0b0',
     textAlign: 'center',
     marginTop: 16,
+  },
+  googleInfoContainer: {
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4285f4',
+  },
+  googleInfoText: {
+    color: '#e0e0e0',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

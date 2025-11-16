@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1006912506028",
+    "project_id": "noiton2",
+    "storage_bucket": "noiton2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1006912506028:android:71aec9cad381dc5efcf709",
+        "android_client_info": {
+          "package_name": "com.noiton2_frontend"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1006912506028-h16b7v9sqic3mukcpmjjvkn41kdl1jes.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.noiton2_frontend",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "1006912506028-j23bdgoj3egia21h3158fme6k5o3f2l1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2TYMSpKayr4MfpQlnZJB4nGnVo6l1XSA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1006912506028-j23bdgoj3egia21h3158fme6k5o3f2l1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
