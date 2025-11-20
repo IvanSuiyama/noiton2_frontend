@@ -27,7 +27,7 @@ const AdminLoginScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   // Credenciais fixas do admin
-  const ADMIN_EMAIL = 'ivan@gmail.com';
+  const ADMIN_EMAIL = 'ivan@adm';
   const ADMIN_SENHA = '501454';
 
   const handleLogin = async () => {
