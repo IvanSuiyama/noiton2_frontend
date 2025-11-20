@@ -11,6 +11,7 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
 import { useTheme } from '../theme/ThemeContext';
+import { useIcons } from '../icons/IconContext';
 import {
   apiCall,
   getActiveWorkspaceId,
@@ -32,6 +33,15 @@ type Props = {
 
 const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
   const { theme } = useTheme();
+  
+  // Usar IconContext com verificação de segurança
+  let iconContext;
+  try {
+    iconContext = useIcons();
+  } catch (error) {
+    console.warn('IconContext não disponível, usando ícone padrão');
+    iconContext = null;
+  }
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [metricas, setMetricas] = useState<MetricasData>({
@@ -120,7 +130,7 @@ const CardDashboardSmall: React.FC<Props> = ({ navigation, refreshKey }) => {
       >
         <View style={[styles.dashboardIcon, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.dashboardIconText, { color: theme.colors.text }]}>
-            📊
+            {iconContext?.getActiveIcon ? iconContext.getActiveIcon('metricas') : '📊'}
           </Text>
         </View>
       </TouchableOpacity>

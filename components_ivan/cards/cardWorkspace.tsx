@@ -19,6 +19,7 @@ import {
 } from '../../services/authService';
 import WorkspaceInterface from '../workspace/workspaceInterface';
 import { useTheme } from '../theme/ThemeContext';
+import { useIcons } from '../icons/IconContext';
 
 type CardWorkspaceNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -29,6 +30,15 @@ interface CardWorkspaceProps {
 
 const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceChange }) => {
   const { theme } = useTheme();
+  
+  // Usar IconContext com verificação de segurança
+  let iconContext;
+  try {
+    iconContext = useIcons();
+  } catch (error) {
+    console.warn('IconContext não disponível, usando ícone padrão');
+    iconContext = null;
+  }
   const pencilIconStyle = {
     fontSize: 18,
     color: theme.colors.textSecondary,
@@ -141,7 +151,7 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
       >
         <View style={[styles.workspaceIcon, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.workspaceIconText, { color: theme.colors.text }]}>
-            {workspaceName.charAt(0).toUpperCase()}
+            {iconContext?.getActiveIcon ? iconContext.getActiveIcon('workspace') : '🏢'}
           </Text>
         </View>
       </TouchableOpacity>

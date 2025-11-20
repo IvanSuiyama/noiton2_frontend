@@ -58,7 +58,7 @@ public class GoogleSignInModule extends ReactContextBaseJavaModule {
     }
 
     /**
-     * Iniciar processo de login com Google
+     * Iniciar processo de login com Google - sempre exibe seletor de contas
      */
     @ReactMethod
     public void signIn(Promise promise) {
@@ -69,9 +69,13 @@ public class GoogleSignInModule extends ReactContextBaseJavaModule {
             return;
         }
         
-        mSignInPromise = promise;
-        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-        currentActivity.startActivityForResult(signInIntent, RC_SIGN_IN);
+        // Fazer signOut silencioso primeiro para forçar seleção de conta
+        mGoogleSignInClient.signOut().addOnCompleteListener(task -> {
+            // Após signOut, iniciar processo de login que sempre mostrará o seletor
+            mSignInPromise = promise;
+            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+            currentActivity.startActivityForResult(signInIntent, RC_SIGN_IN);
+        });
     }
 
     /**

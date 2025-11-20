@@ -32,11 +32,17 @@ interface PermissionResult {
 }
 
 class NotificationService {
-  private eventEmitter: NativeEventEmitter;
+  private eventEmitter: NativeEventEmitter | null;
 
   constructor() {
-    this.eventEmitter = new NativeEventEmitter(NotificationModule);
-    this.setupEventListeners();
+    // Verificar se o módulo de notificação existe antes de criar o EventEmitter
+    if (NotificationModule && typeof NotificationModule.addListener === 'function') {
+      this.eventEmitter = new NativeEventEmitter(NotificationModule);
+      this.setupEventListeners();
+    } else {
+      this.eventEmitter = null;
+      // NotificationModule não disponível - funcionalidades de notificação desabilitadas (silencioso)
+    }
   }
 
   /**
@@ -61,6 +67,9 @@ class NotificationService {
    */
   async checkPermission(): Promise<PermissionResult> {
     try {
+      if (!NotificationModule || !NotificationModule.checkNotificationPermission) {
+        return { enabled: false, status: 'denied' };
+      }
       return await NotificationModule.checkNotificationPermission();
     } catch (error) {
       console.error('Erro ao verificar permissões de notificação:', error);
@@ -73,6 +82,9 @@ class NotificationService {
    */
   async requestPermission(): Promise<NotificationResult> {
     try {
+      if (!NotificationModule || !NotificationModule.requestNotificationPermission) {
+        throw new Error('NotificationModule não disponível');
+      }
       return await NotificationModule.requestNotificationPermission();
     } catch (error) {
       console.error('Erro ao solicitar permissões de notificação:', error);
@@ -85,6 +97,9 @@ class NotificationService {
    */
   async showNotification(title: string, message: string): Promise<NotificationResult> {
     try {
+      if (!NotificationModule || !NotificationModule.showNotification) {
+        return { success: false, message: 'NotificationModule não disponível' };
+      }
       return await NotificationModule.showNotification(title, message);
     } catch (error) {
       console.error('Erro ao mostrar notificação:', error);
@@ -97,6 +112,9 @@ class NotificationService {
    */
   async showNotificationWithData(data: NotificationData): Promise<NotificationResult> {
     try {
+      if (!NotificationModule || !NotificationModule.showNotificationWithExtras) {
+        return { success: false, message: 'NotificationModule não disponível' };
+      }
       return await NotificationModule.showNotificationWithExtras(data);
     } catch (error) {
       console.error('Erro ao mostrar notificação customizada:', error);
@@ -109,6 +127,9 @@ class NotificationService {
    */
   async showTaskReminder(taskData: TaskData): Promise<NotificationResult> {
     try {
+      if (!NotificationModule || !NotificationModule.showTaskReminder) {
+        return { success: false, message: 'NotificationModule não disponível' };
+      }
       console.log('📋 Enviando lembrete de tarefa:', taskData.titulo);
       return await NotificationModule.showTaskReminder(taskData);
     } catch (error) {
@@ -122,6 +143,9 @@ class NotificationService {
    */
   async cancelNotification(notificationId: number): Promise<NotificationResult> {
     try {
+      if (!NotificationModule || !NotificationModule.cancelNotification) {
+        return { success: false, message: 'NotificationModule não disponível' };
+      }
       return await NotificationModule.cancelNotification(notificationId);
     } catch (error) {
       console.error('Erro ao cancelar notificação:', error);
@@ -134,6 +158,9 @@ class NotificationService {
    */
   async cancelAllNotifications(): Promise<NotificationResult> {
     try {
+      if (!NotificationModule || !NotificationModule.cancelAllNotifications) {
+        return { success: false, message: 'NotificationModule não disponível' };
+      }
       return await NotificationModule.cancelAllNotifications();
     } catch (error) {
       console.error('Erro ao cancelar todas as notificações:', error);

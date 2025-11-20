@@ -13,8 +13,9 @@ import {
   getUserEmail,
   apiCall,
 } from '../../services/authService';
-import ThemeToggle from '../theme/ThemeToggle';
+import ThemeSelector from '../theme/ThemeSelector';
 import { useTheme } from '../theme/ThemeContext';
+import { useIcons } from '../icons/IconContext';
 
 type CardUserNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -24,6 +25,16 @@ interface CardUserProps {
 
 const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
   const { theme } = useTheme();
+  
+  // Usar IconContext com verificação de segurança
+  let iconContext;
+  try {
+    iconContext = useIcons();
+  } catch (error) {
+    console.warn('IconContext não disponível, usando ícone padrão');
+    iconContext = null;
+  }
+  
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
@@ -74,7 +85,7 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
     }
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Login' }],
+      routes: [{ name: 'Welcome' }],
     });
   };
 
@@ -87,7 +98,7 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
       >
         <View style={[styles.userIcon, { backgroundColor: theme.colors.background }]}>
           <Text style={[styles.userIconText, { color: theme.colors.text }]}>
-            👤
+            {iconContext?.getActiveIcon ? iconContext.getActiveIcon('usuario') : '👤'}
           </Text>
         </View>
       </TouchableOpacity>
@@ -129,8 +140,8 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
                 <Text style={styles.actionButtonText}>Editar Perfil</Text>
               </TouchableOpacity>
 
-              <View style={styles.themeToggleContainer}>
-                <ThemeToggle showLabel={false} showSwitch={false} />
+              <View style={styles.themeSelectorContainer}>
+                <ThemeSelector showLabel={true} />
               </View>
 
               <TouchableOpacity
@@ -245,9 +256,9 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     gap: 8,
   },
-  themeToggleContainer: {
+  themeSelectorContainer: {
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     borderRadius: 8,
     backgroundColor: 'rgba(108, 117, 125, 0.1)',
   },

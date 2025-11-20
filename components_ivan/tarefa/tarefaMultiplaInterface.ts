@@ -20,6 +20,7 @@ export default interface TarefaMultiplaInterface {
   nivel_acesso?: number; // 0=criador, 1=editor, 2=visualizador
   pode_editar?: boolean;
   pode_apagar?: boolean;
+  criador_email?: string; // Email do criador da tarefa
 }
 
 // Interface para criar nova tarefa (sem id_tarefa e data_criacao)

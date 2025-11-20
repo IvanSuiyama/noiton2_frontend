@@ -65,14 +65,34 @@ const WelcomeScreen: React.FC<Props> = ({navigation}) => {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ 
+              email: email,
+              name: name || email.split('@')[0] // Incluir nome também
+            }),
           });
           
           const loginData = await loginResponse.json();
           
           if (loginResponse.ok && loginData.token) {
-            await AsyncStorage.setItem('token', loginData.token);
-            const workspaceSetup = await setupActiveWorkspace();
+            // Salvar token e email corretamente
+            await AsyncStorage.setItem('auth_token', loginData.token);
+            await AsyncStorage.setItem('user_email', loginData.email || email);
+            
+            console.log('✅ Token e email salvos após Google Sign-In');
+            
+            // Verificar se os dados foram salvos corretamente
+            const tokenSalvo = await AsyncStorage.getItem('auth_token');
+            const emailSalvo = await AsyncStorage.getItem('user_email');
+            console.log('🔍 Verificação pós-salvamento - Token:', !!tokenSalvo, 'Email:', emailSalvo);
+            
+            // Configurar workspace ativo
+            try {
+              const workspaceSetup = await setupActiveWorkspace();
+              console.log('✅ Workspace configurado:', workspaceSetup);
+            } catch (workspaceError) {
+              console.error('⚠️ Erro ao configurar workspace:', workspaceError);
+              // Continua mesmo se houver erro no workspace
+            }
             
             Alert.alert('Login com Google', `Bem-vindo de volta, ${name || email}!`, [
               {
@@ -177,6 +197,14 @@ const WelcomeScreen: React.FC<Props> = ({navigation}) => {
             Uma nova experiência de produtividade{'\n'}inspirada no Notion
           </Text>
         </View>
+
+        {/* Botão Admin (discreto) */}
+        <TouchableOpacity 
+          style={styles.adminButton}
+          onPress={() => navigation.navigate('AdminLogin')}
+        >
+          <Text style={styles.adminButtonText}>👨‍💼</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -325,6 +353,20 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  adminButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminButtonText: {
+    fontSize: 20,
   },
 });
 

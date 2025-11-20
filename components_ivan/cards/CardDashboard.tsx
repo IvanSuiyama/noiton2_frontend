@@ -318,7 +318,9 @@ const CardDashboard: React.FC<CardDashboardProps> = ({ navigation, refreshKey })
           <TouchableOpacity
             style={[styles.exportButton, { backgroundColor: theme.colors.primary }]}
             onPress={exportarPDF}>
-            <Text style={styles.exportButtonText}>📊 Relatório</Text>
+            <Text style={styles.exportButtonText}>
+              📄 Relatório
+            </Text>
           </TouchableOpacity>
         </View>
 

@@ -117,13 +117,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       const userId = await getUserId();
       const name = await getActiveWorkspaceName();
       
-      console.log('🔄 CardTarefas initializeWorkspace:', {
-        workspaceId: id,
-        workspaceName: name,
-        userEmail: email,
-        userId: userId,
-        refreshKey: refreshKey
-      });
+
       setWorkspaceId(id);
       setWorkspaceName(name || '');
       setUserEmail(email || '');
@@ -134,7 +128,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         try {
           // Usar a rota correta: /workspaces/id/:id_workspace
           const workspaceData = await apiCall(`/workspaces/id/${id}`, 'GET');
-          console.log('📋 Dados completos do workspace recebidos:', workspaceData);
+
           setWorkspaceInfo(workspaceData);
           
           // Validar se o workspace carregado é realmente o esperado
@@ -217,11 +211,37 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
   // Função para verificar se o usuário logado é o criador da tarefa
   const isCreator = (tarefa: Tarefa): boolean => {
-    if (!currentUserId) {
+    if (!currentUserId && !userEmail) {
       return false;
     }
-    // Verifica pelo campo nivel_acesso (0 = criador) ou pelo id_usuario se não houver permissões definidas
-    return tarefa.nivel_acesso === 0 || (tarefa.nivel_acesso === undefined && tarefa.id_usuario === currentUserId);
+    
+    // 1. Verificar se é o criador do workspace (tem total controle)
+    if (workspaceInfo?.criador === userEmail) {
+      return true;
+    }
+    
+    // 2. Verificar pelo email do criador da tarefa se disponível
+    if ((tarefa as any).criador_email && userEmail) {
+      const isCreatorByEmail = (tarefa as any).criador_email === userEmail;
+      if (isCreatorByEmail) return true;
+    }
+    
+    // 3. Verificar pelo nível de acesso (0 = criador)
+    if (tarefa.nivel_acesso === 0) {
+      return true;
+    }
+    
+    // 4. Verificar pelo id_usuario (fallback para workspaces individuais)
+    if (tarefa.nivel_acesso === undefined && tarefa.id_usuario === currentUserId) {
+      return true;
+    }
+    
+    // 5. Para workspaces individuais, se você está no workspace, pode editar
+    if (!workspaceInfo?.equipe && workspaceInfo?.emails?.includes(userEmail)) {
+      return true;
+    }
+    
+    return false;
   };
 
   // Função para verificar se pode editar a tarefa
@@ -230,6 +250,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     if (tarefa.pode_editar !== undefined) {
       return tarefa.pode_editar;
     }
+    
     // Fallback: criador (nivel 0) ou editor (nivel 1) podem editar
     return tarefa.nivel_acesso === 0 || tarefa.nivel_acesso === 1 || isCreator(tarefa);
   };
@@ -240,6 +261,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     if (tarefa.pode_apagar !== undefined) {
       return tarefa.pode_apagar;
     }
+    
     // Fallback: apenas criador (nivel 0) pode apagar
     return tarefa.nivel_acesso === 0 || isCreator(tarefa);
   };
@@ -323,16 +345,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       
       // Tarefas carregadas com sucesso
       
-      console.log('📄 Tarefas recebidas da API:', {
-        total: dadosTarefas.length,
-        workspaceId: workspaceId,
-        workspaceInfo: workspaceInfo?.nome || 'Carregando...',
-        tarefas: dadosTarefas.map(t => ({ 
-          id: t.id_tarefa, 
-          titulo: t.titulo, 
-          id_workspace: t.id_workspace 
-        }))
-      });
+      console.log('📄 Tarefas carregadas:', dadosTarefas.length, 'tarefas do workspace', workspaceId);
       
       // VALIDAÇÃO CRÍTICA: Verificar se todas as tarefas pertencem ao workspace correto
       const tarefasInvalidas = dadosTarefas.filter(tarefa => tarefa.id_workspace !== workspaceId);
@@ -474,11 +487,18 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       const novoStatus = tarefa.status === 'concluido' ? 'a_fazer' : 'concluido';
       const novaConcluida = novoStatus === 'concluido';
       
+      // Se está concluindo uma tarefa (não desconcluindo)
+      const estaConcluindo = novoStatus === 'concluido' && tarefa.status !== 'concluido';
+      
       // ✅ Usar o endpoint existente do backend: PUT /tarefas/:id_tarefa
       await apiCall(`/tarefas/${tarefa.id_tarefa}`, 'PUT', {
         status: novoStatus,
         concluida: novaConcluida
       });
+      
+      // O backend já gerencia a adição de pontos automaticamente:
+      // - 0.5 pontos: Por completar qualquer tarefa
+      // - 1.0 ponto total: Por completar tarefa dentro do prazo (0.5 base + 0.5 bônus)
       
       // Recarregar as tarefas para refletir a mudança
       await carregarTarefas();
@@ -526,10 +546,11 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
             onPress={() => handleToggleConcluida(item)}>
             <View style={[
               styles.checkbox,
-              item.status === 'concluido' && styles.checkboxChecked
+              { borderColor: theme.colors.primary },
+              item.status === 'concluido' && { backgroundColor: theme.colors.success }
             ]}>
               {item.status === 'concluido' && (
-                <Text style={styles.checkboxIcon}>✓</Text>
+                <Text style={[styles.checkboxIcon, { color: theme.colors.surface }]}>✓</Text>
               )}
             </View>
           </TouchableOpacity>
@@ -565,7 +586,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
               {/* Ícone de editar - para criadores e editores */}
               {podeEditar && (
                 <TouchableOpacity
-                  style={styles.actionButton}
+                  style={[styles.actionButton, { backgroundColor: theme.colors.primary + '40' }]}
                   onPress={() => handleEditarTarefa(item)}>
                   <Text style={styles.actionIcon}>✏️</Text>
                 </TouchableOpacity>
@@ -574,7 +595,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
               {/* Ícone de deletar - apenas para criadores */}
               {podeApagar && (
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
+                  style={[styles.actionButton, { backgroundColor: theme.colors.error + '40' }]}
                   onPress={() => handleDelete(item)}>
                   <Text style={styles.actionIcon}>🗑️</Text>
                 </TouchableOpacity>
@@ -582,7 +603,7 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
               
               {/* Ícone de favorito - sempre visível */}
               <TouchableOpacity
-                style={[styles.actionButton, isFavorito(item.id_tarefa) && styles.favoritoButton]}
+                style={[styles.actionButton, { backgroundColor: isFavorito(item.id_tarefa) ? theme.colors.warning + '40' : theme.colors.textSecondary + '20' }]}
                 onPress={() => toggleFavorito(item)}>
                 <Text style={styles.actionIcon}>
                   {isFavorito(item.id_tarefa) ? '⭐' : '☆'}
@@ -701,11 +722,11 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         animationType="slide"
         onRequestClose={() => setShowFiltroModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.filtroModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filtros</Text>
+          <View style={[styles.filtroModal, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Filtros</Text>
               <TouchableOpacity onPress={() => setShowFiltroModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Text style={[styles.modalClose, { color: theme.colors.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -794,17 +815,17 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                     height: 22,
                     borderRadius: 6,
                     borderWidth: 2,
-                    borderColor: '#007bff',
-                    backgroundColor: filtros.minhas_tarefas ? '#007bff' : 'transparent',
+                    borderColor: theme.colors.primary,
+                    backgroundColor: filtros.minhas_tarefas ? theme.colors.primary : 'transparent',
                     marginRight: 10,
                     justifyContent: 'center',
                     alignItems: 'center',
                   }}>
                     {filtros.minhas_tarefas && (
-                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
+                      <Text style={{ color: theme.colors.surface, fontWeight: 'bold', fontSize: 16 }}>✓</Text>
                     )}
                   </View>
-                  <Text style={{ color: '#fff', fontSize: 16 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16 }}>
                     Mostrar apenas minhas tarefas
                   </Text>
                 </TouchableOpacity>
@@ -821,17 +842,17 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
                     height: 22,
                     borderRadius: 6,
                     borderWidth: 2,
-                    borderColor: '#28a745',
-                    backgroundColor: filtros.recorrentes ? '#28a745' : 'transparent',
+                    borderColor: theme.colors.success,
+                    backgroundColor: filtros.recorrentes ? theme.colors.success : 'transparent',
                     marginRight: 10,
                     justifyContent: 'center',
                     alignItems: 'center',
                   }}>
                     {filtros.recorrentes && (
-                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>✓</Text>
+                      <Text style={{ color: theme.colors.surface, fontWeight: 'bold', fontSize: 16 }}>✓</Text>
                     )}
                   </View>
-                  <Text style={{ color: '#fff', fontSize: 16 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16 }}>
                     Mostrar apenas tarefas recorrentes
                   </Text>
                 </TouchableOpacity>
@@ -1108,12 +1129,12 @@ const styles = StyleSheet.create({
   },
   
   filtroModal: {
-    backgroundColor: '#2a2a2a',
     borderRadius: 12,
     margin: 20,
     maxHeight: '80%',
     width: '90%',
     maxWidth: 400,
+    // backgroundColor será aplicada dinamicamente
   },
   
   modalHeader: {
@@ -1123,7 +1144,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#3a3a3a',
+    // borderBottomColor será aplicada dinamicamente
   },
   
   modalTitle: {

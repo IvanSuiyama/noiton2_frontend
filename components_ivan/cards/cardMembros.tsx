@@ -16,6 +16,7 @@ import {
 } from '../../services/authService';
 import WorkspaceInterface from '../workspace/workspaceInterface';
 import { useTheme } from '../theme/ThemeContext';
+import { useIcons } from '../icons/IconContext';
 
 interface CardMembrosProps {
   onMembrosAtualizados?: (novosMembros: string[]) => void;
@@ -24,6 +25,15 @@ interface CardMembrosProps {
 
 const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refreshKey }) => {
   const { theme } = useTheme();
+  
+  // Usar IconContext com verificação de segurança
+  let iconContext;
+  try {
+    iconContext = useIcons();
+  } catch (error) {
+    console.warn('IconContext não disponível, usando ícone padrão');
+    iconContext = null;
+  }
   const [novoEmail, setNovoEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [listaMembros, setListaMembros] = useState<string[]>([]);
@@ -152,7 +162,9 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
       onPress={() => setModalVisible(true)}
     >
       <View style={[styles.cardIcon, { backgroundColor: theme.colors.background }]}>
-        <Text style={styles.cardIconText}>👥</Text>
+        <Text style={styles.cardIconText}>
+          {iconContext?.getActiveIcon ? iconContext.getActiveIcon('membros') : '👥'}
+        </Text>
       </View>
     </TouchableOpacity>
   );

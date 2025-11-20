@@ -18,6 +18,8 @@ import CardCalendario from '../cards/cardCalendario';
 import { getActiveWorkspaceId } from '../../services/authService';
 import CardMembros from '../cards/cardMembros';
 import CardDashboardSmall from '../cards/cardDashboardSmall';
+import CardLojinha from '../cards/CardLojinha';
+import CardAjuda from '../cards/CardAjuda';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -90,6 +92,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
         <View style={styles.cardWrapper}>
           <CardUser navigation={navigation} />
+        </View>
+      </View>
+
+      {/* Seção de Cards Adicionais */}
+      <View style={styles.additionalCardsContainer}>
+        <View style={styles.cardRow}>
+          <View style={styles.cardHalf}>
+            <CardLojinha onPress={() => navigation.navigate('Lojinha')} />
+          </View>
+          <View style={styles.cardHalf}>
+            <CardAjuda onPress={() => navigation.navigate('Ajuda')} />
+          </View>
         </View>
       </View>
 
@@ -233,8 +247,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  additionalCardsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  cardHalf: {
+    flex: 1,
+    marginHorizontal: 6,
+  },
+
   centerSpace: {
-    height: 150,
+    height: 100,
     backgroundColor: 'transparent',
   },
 

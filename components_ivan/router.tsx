@@ -2,10 +2,15 @@ import React, { useEffect } from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import { ThemeProvider } from './theme/ThemeContext';
+import { IconProvider } from './icons/IconContext';
 import CalendarSyncService from '../services/calendarSyncService';
 
 import WelcomeScreen from './welcome/WelcomeScreen';
 import LoginScreen from './auth/LoginScreen';
+import AdminLoginScreen from './admin/AdminLoginScreen';
+import AdminScreen from './admin/AdminScreen';
+import LojinhaScreen from './lojinha/LojinhaScreen';
+import AjudaScreen from './ajuda/AjudaScreen';
 
 import CadUsuario from './usuario/cadUsuario';
 import EditUsuario from './usuario/editUsuario';
@@ -36,6 +41,10 @@ export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   GoogleSignIn: undefined;
+  AdminLogin: undefined;
+  Admin: undefined;
+  Lojinha: undefined;
+  Ajuda: undefined;
 
   Home: undefined;
 
@@ -94,7 +103,8 @@ const Router: React.FC = () => {
 
   return (
     <ThemeProvider>
-      <NavigationContainer>
+      <IconProvider>
+        <NavigationContainer>
         <Stack.Navigator
         initialRouteName="Welcome"
         screenOptions={{
@@ -128,6 +138,39 @@ const Router: React.FC = () => {
           options={{
             title: 'Login',
             headerBackTitleVisible: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="AdminLogin"
+          component={AdminLoginScreen}
+          options={{
+            title: 'Login Admin',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="Admin"
+          component={AdminScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="Lojinha"
+          component={LojinhaScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="Ajuda"
+          component={AjudaScreen}
+          options={{
+            headerShown: false,
           }}
         />
 
@@ -309,7 +352,8 @@ const Router: React.FC = () => {
         />
 
         </Stack.Navigator>
-      </NavigationContainer>
+        </NavigationContainer>
+      </IconProvider>
     </ThemeProvider>
   );
 };

@@ -84,13 +84,26 @@ export const apiCall = async (
   includeWorkspace = false,
 ) => {
   const token = await getToken();
+  const email = await getUserEmail();
+  
+  // Só logar se houver token (evitar spam após logout)
+  if (token) {
+    console.log(`📡 apiCall ${method} ${endpoint} - Token existe:`, !!token, 'Email:', email);
+  }
 
   if (!token) {
+    // Silenciar erro após logout
     throw new Error('Token não encontrado. Faça login novamente.');
+  }
+
+  if (!email) {
+    console.error('❌ Email não encontrado para requisição:', endpoint);
+    throw new Error('Email do usuário não encontrado. Faça login novamente.');
   }
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
+    'X-User-Email': email, // Incluir email no header
   };
 
   // Para FormData, não definir Content-Type (deixar o fetch definir automaticamente)
@@ -123,6 +136,7 @@ export const apiCall = async (
 
   // SE TOKEN EXPIROU (401)
   if (response.status === 401) {
+    console.error('❌ Token expirado (401) para requisição:', endpoint);
     await logout(); // Limpar storage
     throw new Error('Token expirado. Faça login novamente.');
   }
@@ -294,15 +308,42 @@ export const clearActiveWorkspace = async (): Promise<void> => {
 // =====================================================
 export const getUserWorkspaces = async () => {
   try {
+    const token = await getToken();
     const email = await getUserEmail();
+    
+    // Só logar se houver token (evitar spam após logout)
+    if (token) {
+      console.log('🔍 getUserWorkspaces - Token existe:', !!token);
+      console.log('🔍 getUserWorkspaces - Email:', email);
+    }
+    
     if (!email) {
       throw new Error('Usuário não autenticado');
     }
 
-    const response = await apiCall(`/workspaces/email/${encodeURIComponent(email)}`, 'GET');
-    return response;
+    if (!token) {
+      throw new Error('Token não encontrado');
+    }
+
+    console.log('📡 Fazendo requisição para buscar workspaces...');
+    // Primeira tentativa: endpoint com email na URL
+    try {
+      const response = await apiCall(`/workspaces/email/${encodeURIComponent(email)}`, 'GET');
+      console.log('✅ Workspaces recebidos:', response?.length || 0);
+      return response;
+    } catch (error) {
+      console.log('⚠️ Primeira tentativa falhou, tentando endpoint alternativo...');
+      // Segunda tentativa: endpoint genérico que usa o email do header
+      const response = await apiCall('/workspaces/meus', 'GET');
+      console.log('✅ Workspaces recebidos (tentativa 2):', response?.length || 0);
+      return response;
+    }
   } catch (error) {
-    console.error('Erro ao buscar workspaces do usuário:', error);
+    // Silenciar erro se não há token (usuário fez logout)
+    const token = await getToken();
+    if (token) {
+      console.error('Erro ao buscar workspaces do usuário:', error);
+    }
     throw error;
   }
 };
@@ -320,16 +361,33 @@ export const hasUserWorkspaces = async (): Promise<boolean> => {
 // Função para configurar workspace ativo após login
 export const setupActiveWorkspace = async (): Promise<{hasWorkspace: boolean, workspace?: any}> => {
   try {
+    // Aguardar um pouco para garantir que o token foi salvo
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+    
+    console.log('🔍 Verificando autenticação antes de buscar workspaces...');
+    const token = await getToken();
+    const email = await getUserEmail();
+    
+    if (!token || !email) {
+      console.error('❌ Token ou email não encontrados');
+      throw new Error('Usuário não autenticado');
+    }
+    
+    console.log('✅ Token e email verificados, buscando workspaces...');
     const workspaces = await getUserWorkspaces();
+    
     if (workspaces && workspaces.length > 0) {
       // Se tem workspace(s), define o primeiro como ativo
       const firstWorkspace = workspaces[0];
       await setActiveWorkspace(firstWorkspace.id_workspace, firstWorkspace.nome);
+      console.log('✅ Workspace ativo configurado:', firstWorkspace.nome);
       return {
         hasWorkspace: true,
         workspace: firstWorkspace
       };
     }
+    
+    console.log('ℹ️ Usuário não possui workspaces');
     return {hasWorkspace: false};
   } catch (error) {
     console.error('Erro ao configurar workspace ativo:', error);
@@ -471,3 +529,45 @@ export const removerPermissaoTarefa = async (id_tarefa: number, id_usuario: numb
     throw error;
   }
 };
+
+// =====================================================
+// 💰 FUNÇÕES DE PONTOS DO USUÁRIO
+// =====================================================
+
+// Buscar pontos do usuário logado
+export const getPontosUsuario = async (): Promise<number> => {
+  try {
+    const response = await apiCall('/usuarios/meus-pontos', 'GET');
+    return response.pontos || 0;
+  } catch (error) {
+    console.error('Erro ao buscar pontos do usuário:', error);
+    return 0;
+  }
+};
+
+// Função para comprar item na lojinha (deduz pontos)
+export const comprarItemLojinha = async (valorItem: number): Promise<boolean> => {
+  try {
+    // Buscar pontos atuais
+    const pontosAtuais = await getPontosUsuario();
+    
+    if (pontosAtuais < valorItem) {
+      throw new Error('Pontos insuficientes');
+    }
+    
+    // ✅ Usar rota real do backend para remover pontos
+    const response = await apiCall('/usuarios/remover-pontos', 'POST', { 
+      pontos: valorItem 
+    });
+    
+    console.log(`✅ Compra realizada! ${valorItem} pontos removidos. Pontos restantes: ${response.pontosRestantes}`);
+    return true;
+  } catch (error) {
+    console.error('Erro ao comprar item:', error);
+    return false;
+  }
+};
+
+
+
+

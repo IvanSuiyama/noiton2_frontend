@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
+import { useTheme } from '../theme/ThemeContext';
 import {
   apiCall,
   getActiveWorkspaceId,
@@ -30,6 +31,7 @@ interface DiaCalendario {
 }
 
 const CalendarioScreen: React.FC<CalendarioScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
   const [mesAtual, setMesAtual] = useState(new Date());
   const [diasCalendario, setDiasCalendario] = useState<DiaCalendario[]>([]);
   const [tarefasSelecionadas, setTarefasSelecionadas] = useState<TarefaMultiplaInterface[]>([]);
@@ -176,6 +178,8 @@ const CalendarioScreen: React.FC<CalendarioScreenProps> = ({ navigation }) => {
     );
   };
 
+  const styles = createStyles(theme);
+
   const renderTarefa = (tarefa: TarefaMultiplaInterface) => (
     <TouchableOpacity
       key={tarefa.id_tarefa}
@@ -214,7 +218,7 @@ const CalendarioScreen: React.FC<CalendarioScreenProps> = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Carregando calendário...</Text>
         </View>
       </View>
@@ -281,10 +285,10 @@ const CalendarioScreen: React.FC<CalendarioScreenProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -295,39 +299,39 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6c757d',
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.colors.border,
   },
   navButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   navButtonText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   mesAno: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   diasSemanaContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     paddingVertical: 12,
     paddingHorizontal: 8,
   },
@@ -336,12 +340,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
-    color: '#6c757d',
+    color: theme.colors.textSecondary,
   },
   calendarioGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 8,
     paddingBottom: 8,
   },
@@ -358,32 +362,32 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   diaHoje: {
-    backgroundColor: '#007bff',
+    backgroundColor: theme.colors.primary,
   },
   diaSelecionado: {
-    backgroundColor: '#28a745',
+    backgroundColor: theme.colors.success,
   },
   diaTexto: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: theme.colors.text,
   },
   diaTextoOutroMes: {
-    color: '#6c757d',
+    color: theme.colors.textSecondary,
   },
   diaTextoHoje: {
-    color: '#fff',
+    color: theme.colors.surface,
     fontWeight: 'bold',
   },
   diaTextoSelecionado: {
-    color: '#fff',
+    color: theme.colors.surface,
     fontWeight: 'bold',
   },
   indicadorTarefas: {
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: '#dc3545',
+    backgroundColor: theme.colors.error,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -393,29 +397,29 @@ const styles = StyleSheet.create({
   numeroTarefas: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.surface,
   },
   tarefasContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
     padding: 16,
   },
   tarefasTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
   },
   tarefasList: {
     flex: 1,
   },
   tarefaItem: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.colors.border,
   },
   tarefaContent: {
     flexDirection: 'row',
@@ -429,12 +433,12 @@ const styles = StyleSheet.create({
   tarefaTitulo: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   tarefaDescricao: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     lineHeight: 18,
   },
@@ -444,22 +448,22 @@ const styles = StyleSheet.create({
   },
   statusConcluida: {
     fontSize: 12,
-    color: '#28a745',
+    color: theme.colors.success,
     fontWeight: '500',
   },
   statusAndamento: {
     fontSize: 12,
-    color: '#17a2b8',
+    color: theme.colors.info,
     fontWeight: '500',
   },
   statusAtrasada: {
     fontSize: 12,
-    color: '#dc3545',
+    color: theme.colors.error,
     fontWeight: '500',
   },
   statusPendente: {
     fontSize: 12,
-    color: '#ffc107',
+    color: theme.colors.warning,
     fontWeight: '500',
   },
   tarefaAction: {
@@ -467,7 +471,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 36,
     height: 36,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
     borderRadius: 18,
   },
   actionIcon: {
@@ -485,7 +489,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6c757d',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
 });
