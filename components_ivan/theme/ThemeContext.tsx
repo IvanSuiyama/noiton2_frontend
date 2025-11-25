@@ -95,7 +95,7 @@ interface ThemeContextType {
   currentThemeType: ThemeType;
   toggleTheme: () => void;
   setTheme: (isDark: boolean) => void;
-  setThemeByType: (themeType: ThemeType) => void;
+  setThemeByType: (themeType: ThemeType, forceAdmin?: boolean) => void;
   getThemeByType: (themeType: ThemeType) => Theme;
   getAllThemes: () => { type: ThemeType; name: string; theme: Theme; price: number; isPremium: boolean }[];
   isThemeUnlocked: (themeType: ThemeType) => Promise<boolean>;
@@ -157,9 +157,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   };
 
-  const setThemeByType = async (themeType: ThemeType) => {
+  const setThemeByType = async (themeType: ThemeType, forceAdmin: boolean = false) => {
     const isUnlocked = await isThemeUnlocked(themeType);
-    if (!isUnlocked) {
+    if (!isUnlocked && !forceAdmin) {
       throw new Error('Tema não desbloqueado');
     }
     setCurrentThemeType(themeType);

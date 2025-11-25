@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, noiton1Theme } from '../theme/ThemeContext';
 
 type AdminLoginNavigationProp = StackNavigationProp<RootStackParamList, 'AdminLogin'>;
 
@@ -21,10 +21,22 @@ type Props = {
 };
 
 const AdminLoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { theme } = useTheme();
+  const { theme, setThemeByType } = useTheme();
   const [email, setEmail] = useState<string>('');
   const [senha, setSenha] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Definir tema Noiton 1.0 para área administrativa (forçado)
+  useEffect(() => {
+    const setAdminTheme = async () => {
+      try {
+        await setThemeByType('noiton1', true); // forçar tema admin
+      } catch (error) {
+        console.log('Erro ao definir tema administrativo:', error);
+      }
+    };
+    setAdminTheme();
+  }, []);
 
   // Credenciais fixas do admin
   const ADMIN_EMAIL = 'ivan@adm';
@@ -41,18 +53,13 @@ const AdminLoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       // Verificar credenciais fixas
       if (email.trim() === ADMIN_EMAIL && senha.trim() === ADMIN_SENHA) {
-        Alert.alert('Login Admin', 'Bem-vindo, Administrador!', [
-          {
-            text: 'Continuar',
-            onPress: () => {
-              navigation.replace('Admin');
-            },
-          },
-        ]);
+        console.log('✅ Admin logado com sucesso');
+        navigation.replace('Admin');
       } else {
         Alert.alert('Erro', 'Credenciais de administrador inválidas');
       }
     } catch (error) {
+      console.error('Erro no login admin:', error);
       Alert.alert('Erro', 'Erro interno no login do administrador');
     } finally {
       setLoading(false);
