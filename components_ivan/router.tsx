@@ -7,6 +7,7 @@ import CalendarSyncService from '../services/calendarSyncService';
 
 import WelcomeScreen from './welcome/WelcomeScreen';
 import LoginScreen from './auth/LoginScreen';
+import LoginOfflineScreen from './auth/loginOffline';
 import AdminLoginScreen from './admin/AdminLoginScreen';
 import AdminScreen from './admin/AdminScreen';
 import LojinhaScreen from './lojinha/LojinhaScreen';
@@ -40,6 +41,7 @@ export type RootStackParamList = {
 
   Welcome: undefined;
   Login: undefined;
+  LoginOffline: undefined;
   GoogleSignIn: undefined;
   AdminLogin: undefined;
   Admin: undefined;
@@ -137,6 +139,15 @@ const Router: React.FC = () => {
           component={LoginScreen}
           options={{
             title: 'Login',
+            headerBackTitleVisible: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="LoginOffline"
+          component={LoginOfflineScreen}
+          options={{
+            title: 'Login Offline',
             headerBackTitleVisible: false,
           }}
         />

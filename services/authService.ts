@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeModules } from 'react-native';
 
+const { AuthModule } = NativeModules;
 const API_BASE = 'http://192.168.15.14:3000';
 const TOKEN_KEY = 'auth_token';
 const EMAIL_KEY = 'user_email';
@@ -21,12 +23,24 @@ export const login = async (email: string, senha: string) => {
     const data = await response.json();
 
     if (response.ok) {
-      // SALVAR TOKEN + EMAIL
+      // SALVAR TOKEN + EMAIL (AsyncStorage + Java seguro)
       await AsyncStorage.setItem(TOKEN_KEY, data.token);
       await AsyncStorage.setItem(EMAIL_KEY, data.email);
-      // Para simplificar, vamos assumir que o ID será obtido de outra forma
-      // ou que o backend retorna o ID junto com o token
       await AsyncStorage.setItem(USER_ID_KEY, '1'); // Temporário
+      
+      // Salvar também no módulo Java seguro para login offline
+      if (AuthModule) {
+        try {
+          await AuthModule.saveToken(data.token);
+          await AuthModule.saveUser(JSON.stringify({
+            email: data.email,
+            id: 1,
+            loginTime: new Date().toISOString()
+          }));
+        } catch (javaError) {
+          console.log('⚠️ Erro ao salvar no módulo Java:', javaError);
+        }
+      }
 
       return {sucesso: true, token: data.token, email: data.email};
     }
@@ -38,11 +52,19 @@ export const login = async (email: string, senha: string) => {
 };
 
 // =====================================================
-// 2️⃣ FUNÇÃO PARA OBTER TOKEN DO STORAGE
+// 2️⃣ FUNÇÃO PARA OBTER TOKEN DO STORAGE (COM FALLBACK JAVA)
 // =====================================================
 export const getToken = async (): Promise<string | null> => {
   try {
-    return await AsyncStorage.getItem(TOKEN_KEY);
+    // Primeiro tenta o AsyncStorage (compatibilidade)
+    let token = await AsyncStorage.getItem(TOKEN_KEY);
+    
+    // Se não encontrar, tenta o módulo Java seguro
+    if (!token && AuthModule) {
+      token = await AuthModule.getToken();
+    }
+    
+    return token;
   } catch (error) {
     console.error('Erro ao obter token:', error);
     return null;
@@ -193,6 +215,52 @@ export const getWorkspaceByEmail = async (email: string) => {
 // =====================================================
 // 7️⃣ OBTER WORKSPACES DO USUÁRIO LOGADO
 // =====================================================
+// =====================================================
+// 🔒 FUNÇÃO DE LOGIN OFFLINE (USA TOKEN SALVO)
+// =====================================================
+export const loginOffline = async () => {
+  try {
+    if (!AuthModule) {
+      return { sucesso: false, erro: 'Módulo de autenticação não disponível' };
+    }
+
+    // Buscar token e dados do usuário salvos no módulo Java
+    const token = await AuthModule.getToken();
+    const userDataString = await AuthModule.getUser();
+
+    if (!token) {
+      return { sucesso: false, erro: 'Nenhum login anterior encontrado' };
+    }
+
+    let userData = null;
+    if (userDataString) {
+      try {
+        userData = JSON.parse(userDataString);
+      } catch (parseError) {
+        console.log('⚠️ Erro ao fazer parse dos dados do usuário');
+      }
+    }
+
+    // Restaurar dados no AsyncStorage para compatibilidade
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+    if (userData?.email) {
+      await AsyncStorage.setItem(EMAIL_KEY, userData.email);
+      await AsyncStorage.setItem(USER_ID_KEY, userData.id?.toString() || '1');
+    }
+
+    return {
+      sucesso: true,
+      token,
+      email: userData?.email || 'offline@user.com',
+      modo: 'offline'
+    };
+
+  } catch (error) {
+    console.error('Erro no login offline:', error);
+    return { sucesso: false, erro: 'Falha ao fazer login offline' };
+  }
+};
+
 export const logout = async (): Promise<void> => {
   try {
     await AsyncStorage.multiRemove([
@@ -202,6 +270,15 @@ export const logout = async (): Promise<void> => {
       ACTIVE_WORKSPACE_KEY, 
       ACTIVE_WORKSPACE_NAME_KEY
     ]);
+    
+    // Limpar também do módulo Java
+    if (AuthModule) {
+      try {
+        await AuthModule.clearToken();
+      } catch (javaError) {
+        console.log('⚠️ Erro ao limpar módulo Java:', javaError);
+      }
+    }
   } catch (error) {
     console.error('Erro ao fazer logout:', error);
   }

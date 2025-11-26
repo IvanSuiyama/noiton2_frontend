@@ -69,3 +69,7 @@ components_ivan/urls.txt
 backend_temporario/
 segunda_entrega.txt
 roteiroEmail.txt
+mudarIP.md
+reset-gradle.md
+
+tools/change-ip.js

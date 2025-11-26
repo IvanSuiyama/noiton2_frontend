@@ -20,6 +20,7 @@ import CardMembros from '../cards/cardMembros';
 import CardDashboardSmall from '../cards/cardDashboardSmall';
 import CardLojinha from '../cards/CardLojinha';
 import CardAjuda from '../cards/CardAjuda';
+import CacheOffline from '../cache/Cacheoffline';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -34,6 +35,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState<number | null>(null);
+  const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
     const fetchWorkspaceId = async () => {
@@ -79,7 +81,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {}
+      {/* Componente invisível de monitoramento de conectividade */}
+      <CacheOffline 
+        onConnectivityChange={setIsConnected}
+        showReconnectingMessage={true}
+      />
+      
+      {/* Header superior */}
       <View style={[styles.topHeader, { backgroundColor: theme.colors.background }]}>
         <View style={styles.cardWrapper}>
           <CardWorkspace navigation={navigation} />

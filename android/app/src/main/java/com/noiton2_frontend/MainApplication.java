@@ -29,6 +29,10 @@ public class MainApplication extends Application implements ReactApplication {
           packages.add(new FilePickerPackage());
           packages.add(new NotificationPackage());
           packages.add(new GoogleSignInPackage());
+          packages.add(new DBPackage());
+          packages.add(new SyncPackage());
+          packages.add(new AuthPackage());
+
           return packages;
         }
 
