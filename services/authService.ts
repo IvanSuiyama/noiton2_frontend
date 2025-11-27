@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NativeModules } from 'react-native';
 
-const { AuthModule } = NativeModules;
+
 const API_BASE = 'http://192.168.15.14:3000';
 const TOKEN_KEY = 'auth_token';
 const EMAIL_KEY = 'user_email';
@@ -28,19 +27,7 @@ export const login = async (email: string, senha: string) => {
       await AsyncStorage.setItem(EMAIL_KEY, data.email);
       await AsyncStorage.setItem(USER_ID_KEY, '1'); // Temporário
       
-      // Salvar também no módulo Java seguro para login offline
-      if (AuthModule) {
-        try {
-          await AuthModule.saveToken(data.token);
-          await AuthModule.saveUser(JSON.stringify({
-            email: data.email,
-            id: 1,
-            loginTime: new Date().toISOString()
-          }));
-        } catch (javaError) {
-          console.log('⚠️ Erro ao salvar no módulo Java:', javaError);
-        }
-      }
+      // Token salvo apenas no AsyncStorage
 
       return {sucesso: true, token: data.token, email: data.email};
     }
@@ -59,10 +46,7 @@ export const getToken = async (): Promise<string | null> => {
     // Primeiro tenta o AsyncStorage (compatibilidade)
     let token = await AsyncStorage.getItem(TOKEN_KEY);
     
-    // Se não encontrar, tenta o módulo Java seguro
-    if (!token && AuthModule) {
-      token = await AuthModule.getToken();
-    }
+    // Token apenas do AsyncStorage
     
     return token;
   } catch (error) {
@@ -216,42 +200,22 @@ export const getWorkspaceByEmail = async (email: string) => {
 // 7️⃣ OBTER WORKSPACES DO USUÁRIO LOGADO
 // =====================================================
 // =====================================================
-// 🔒 FUNÇÃO DE LOGIN OFFLINE (USA TOKEN SALVO)
+// 🔒 FUNÇÃO DE LOGIN OFFLINE (SIMPLIFICADA)
 // =====================================================
 export const loginOffline = async () => {
   try {
-    if (!AuthModule) {
-      return { sucesso: false, erro: 'Módulo de autenticação não disponível' };
-    }
+    // Buscar token e dados salvos no AsyncStorage
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    const email = await AsyncStorage.getItem(EMAIL_KEY);
 
-    // Buscar token e dados do usuário salvos no módulo Java
-    const token = await AuthModule.getToken();
-    const userDataString = await AuthModule.getUser();
-
-    if (!token) {
+    if (!token || !email) {
       return { sucesso: false, erro: 'Nenhum login anterior encontrado' };
-    }
-
-    let userData = null;
-    if (userDataString) {
-      try {
-        userData = JSON.parse(userDataString);
-      } catch (parseError) {
-        console.log('⚠️ Erro ao fazer parse dos dados do usuário');
-      }
-    }
-
-    // Restaurar dados no AsyncStorage para compatibilidade
-    await AsyncStorage.setItem(TOKEN_KEY, token);
-    if (userData?.email) {
-      await AsyncStorage.setItem(EMAIL_KEY, userData.email);
-      await AsyncStorage.setItem(USER_ID_KEY, userData.id?.toString() || '1');
     }
 
     return {
       sucesso: true,
       token,
-      email: userData?.email || 'offline@user.com',
+      email,
       modo: 'offline'
     };
 
@@ -271,14 +235,7 @@ export const logout = async (): Promise<void> => {
       ACTIVE_WORKSPACE_NAME_KEY
     ]);
     
-    // Limpar também do módulo Java
-    if (AuthModule) {
-      try {
-        await AuthModule.clearToken();
-      } catch (javaError) {
-        console.log('⚠️ Erro ao limpar módulo Java:', javaError);
-      }
-    }
+    // Token limpo apenas do AsyncStorage
   } catch (error) {
     console.error('Erro ao fazer logout:', error);
   }
