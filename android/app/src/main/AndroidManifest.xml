@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- PERMISSÕES EXISTENTES -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
@@ -18,13 +19,20 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- NOVAS PERMISSÕES PARA SISTEMA OFFLINE -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
-      android:theme="@style/AppTheme">
+      android:theme="@style/AppTheme"
+      android:usesCleartextTraffic="true"> <!-- IMPORTANTE para comunicação com backend local -->
+
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
@@ -47,5 +55,12 @@
           <action android:name="SNOOZE_TASK" />
         </intent-filter>
       </receiver>
+
+      <!-- SERVIÇO PARA SINCRONIZAÇÃO EM SEGUNDO PLANO (OPCIONAL) -->
+      <service
+        android:name=".sync.SyncService"
+        android:enabled="true"
+        android:exported="false" />
+
     </application>
 </manifest>

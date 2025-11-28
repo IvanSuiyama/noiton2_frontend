@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeModules } from 'react-native';
+import { databaseService } from './databaseService'; // 🟢 IMPORTAR SERVICE REAL
 
+const { SyncService } = NativeModules;
 
 const API_BASE = 'http://192.168.15.14:3000';
 const TOKEN_KEY = 'auth_token';
@@ -7,12 +10,149 @@ const EMAIL_KEY = 'user_email';
 const USER_ID_KEY = 'user_id';
 const ACTIVE_WORKSPACE_KEY = 'active_workspace_id';
 const ACTIVE_WORKSPACE_NAME_KEY = 'active_workspace_name';
+const LAST_SYNC_KEY = 'last_sync_timestamp';
+const HAS_LOCAL_DATA_KEY = 'has_local_data';
 
 // =====================================================
-// 1️⃣ FUNÇÃO DE LOGIN (OBTER TOKEN)
+// 🆕 FUNÇÕES DE SINCRONIZAÇÃO - AGORA USANDO SERVICE REAL
+// =====================================================
+
+/**
+ * Verifica se está conectado à internet
+ */
+const checkConnection = async (): Promise<boolean> => {
+  try {
+    return await SyncService.isConnected();
+  } catch (error) {
+    console.error('Erro ao verificar conexão:', error);
+    return false;
+  }
+};
+
+/**
+ * Verifica se existe dados locais no SQLite (AGORA REAL)
+ */
+const hasLocalData = async (): Promise<boolean> => {
+  try {
+    // 🟢 AGORA USA DATABASE SERVICE REAL
+    return await databaseService.hasLocalData();
+  } catch (error) {
+    console.error('Erro ao verificar dados locais:', error);
+    return false;
+  }
+};
+
+/**
+ * Sincroniza dados do PostgreSQL para SQLite (AGORA REAL)
+ */
+const syncPostgreSQLToSQLite = async (email: string, token: string): Promise<boolean> => {
+  try {
+    console.log('🔄 Iniciando sincronização PostgreSQL → SQLite (REAL)...');
+
+    // Buscar dados completos do backend
+    const response = await fetch(`${API_BASE}/sync/initial-data/${encodeURIComponent(email)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro HTTP: ${response.status}`);
+    }
+
+    const dados = await response.json();
+    
+    console.log('📥 Dados recebidos para sincronização:', {
+      workspaces: dados.workspaces?.length || 0,
+      categorias: dados.categorias?.length || 0,
+      tarefas: dados.tarefas?.length || 0,
+      comentarios: dados.comentarios?.length || 0,
+      anexos: dados.anexos?.length || 0
+    });
+
+    // 🟢 AGORA USA DATABASE SERVICE REAL
+    const syncResult = await databaseService.saveFullSyncData({
+      ...dados,
+      user_email: email
+    });
+
+    if (!syncResult.success) {
+      throw new Error(syncResult.error || 'Falha ao salvar dados no SQLite');
+    }
+
+    await AsyncStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+
+    console.log('✅ Sincronização PostgreSQL → SQLite concluída (REAL)');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Erro na sincronização:', error);
+    return false;
+  }
+};
+
+/**
+ * Lógica principal de sincronização baseada nas regras definidas (AGORA REAL)
+ */
+const handleSyncLogic = async (email: string, token: string): Promise<void> => {
+  const isConnected = await checkConnection();
+  const hasData = await hasLocalData();
+
+  console.log(`🔍 Status sync - Conectado: ${isConnected}, Tem dados locais: ${hasData}`);
+
+  if (isConnected) {
+    // 📱 COM INTERNET
+    if (!hasData) {
+      // 🔄 Primeiro login - cria cópia do PostgreSQL
+      console.log('🆕 Primeiro login - Criando cópia do PostgreSQL para SQLite (REAL)');
+      const syncSuccess = await syncPostgreSQLToSQLite(email, token);
+      
+      if (!syncSuccess) {
+        throw new Error('Falha na sincronização inicial');
+      }
+    } else {
+      // 📊 Já tem dados locais - verificar se precisa atualizar
+      const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
+      console.log(`📅 Última sincronização: ${lastSync || 'Nunca'}`);
+      
+      // Por enquanto sempre sincroniza quando online
+      // Futuramente podemos implementar verificação de mudanças
+      console.log('🔄 Sincronizando dados atualizados...');
+      const syncSuccess = await syncPostgreSQLToSQLite(email, token);
+      
+      if (!syncSuccess) {
+        console.warn('⚠️  Sincronização falhou, mas continuando com dados locais');
+      }
+    }
+  } else {
+    // 📴 SEM INTERNET
+    if (!hasData) {
+      console.log('⚠️  Sem internet e sem dados locais - Login offline não possível');
+      throw new Error('Conecte-se à internet para fazer o primeiro login');
+    } else {
+      console.log('📴 Modo offline - Usando dados locais do SQLite (REAL)');
+      // Nada a fazer - já temos dados locais
+    }
+  }
+};
+
+// =====================================================
+// 1️⃣ FUNÇÃO DE LOGIN - ATUALIZADA COM SINCRONIZAÇÃO REAL
 // =====================================================
 export const login = async (email: string, senha: string) => {
   try {
+    const isConnected = await checkConnection();
+    
+    if (!isConnected) {
+      // 🔄 Tenta login offline se não tem conexão
+      console.log('📴 Sem conexão - Tentando login offline...');
+      return await loginOffline();
+    }
+
+    // 🌐 Login online normal
+    console.log('🌐 Fazendo login online...');
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -22,42 +162,217 @@ export const login = async (email: string, senha: string) => {
     const data = await response.json();
 
     if (response.ok) {
-      // SALVAR TOKEN + EMAIL (AsyncStorage + Java seguro)
+      // Salvar credenciais
       await AsyncStorage.setItem(TOKEN_KEY, data.token);
       await AsyncStorage.setItem(EMAIL_KEY, data.email);
-      await AsyncStorage.setItem(USER_ID_KEY, '1'); // Temporário
-      
-      // Token salvo apenas no AsyncStorage
+      await AsyncStorage.setItem(USER_ID_KEY, data.id_usuario?.toString() || '1');
 
-      return {sucesso: true, token: data.token, email: data.email};
+      console.log('✅ Login online realizado - Iniciando sincronização...');
+
+      // 🔄 EXECUTAR LÓGICA DE SINCRONIZAÇÃO REAL
+      try {
+        await handleSyncLogic(data.email, data.token);
+        console.log('🎉 Login e sincronização completos! (REAL)');
+      } catch (syncError: any) {
+        console.error('⚠️  Erro na sincronização, mas login foi realizado:', syncError);
+        // Continua mesmo com erro de sync - pelo menos temos credenciais
+      }
+
+      return {
+        sucesso: true, 
+        token: data.token, 
+        email: data.email,
+        modo: 'online' as const
+      };
     }
 
     return {sucesso: false, erro: data.error};
-  } catch (error) {
-    return {sucesso: false, erro: 'Conexão falhou'};
+  } catch (error: any) {
+    console.error('❌ Erro no login:', error);
+    
+    // 🔄 Fallback para login offline
+    console.log('🔄 Tentando fallback para login offline...');
+    const offlineResult = await loginOffline();
+    
+    if (offlineResult.sucesso) {
+      return {
+        ...offlineResult,
+        mensagem: `Modo offline (erro online: ${error.message})`
+      };
+    }
+    
+    return {
+      sucesso: false, 
+      erro: error.message || 'Conexão falhou'
+    };
   }
 };
 
 // =====================================================
-// 2️⃣ FUNÇÃO PARA OBTER TOKEN DO STORAGE (COM FALLBACK JAVA)
+// 🔒 FUNÇÃO DE LOGIN OFFLINE - ATUALIZADA COM DADOS REAIS
 // =====================================================
+export const loginOffline = async (): Promise<{
+  sucesso: boolean;
+  token?: string;
+  email?: string;
+  modo?: 'offline';
+  erro?: string;
+  mensagem?: string;
+}> => {
+  try {
+    // Buscar token e dados salvos
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    const email = await AsyncStorage.getItem(EMAIL_KEY);
+    
+    // 🟢 AGORA VERIFICA DADOS REAIS NO SQLITE
+    const hasData = await hasLocalData();
+
+    if (!token || !email) {
+      return { 
+        sucesso: false, 
+        erro: 'Nenhum login anterior encontrado' 
+      };
+    }
+
+    if (!hasData) {
+      return {
+        sucesso: false,
+        erro: 'Nenhum dado local encontrado. Conecte-se à internet primeiro.'
+      };
+    }
+
+    console.log('🔐 Login offline realizado com sucesso - Dados locais disponíveis');
+
+    return {
+      sucesso: true,
+      token,
+      email,
+      modo: 'offline' as const,
+      mensagem: 'Login offline realizado com sucesso'
+    };
+
+  } catch (error: any) {
+    console.error('Erro no login offline:', error);
+    return { 
+      sucesso: false, 
+      erro: 'Falha ao fazer login offline' 
+    };
+  }
+};
+
+// =====================================================
+// 🚪 FUNÇÃO DE LOGOUT - ATUALIZADA COM LIMPEZA REAL
+// =====================================================
+export const logout = async (): Promise<void> => {
+  try {
+    // Limpar AsyncStorage
+    await AsyncStorage.multiRemove([
+      TOKEN_KEY, 
+      EMAIL_KEY, 
+      USER_ID_KEY, 
+      ACTIVE_WORKSPACE_KEY, 
+      ACTIVE_WORKSPACE_NAME_KEY,
+      LAST_SYNC_KEY
+    ]);
+
+    // 🟢 AGORA LIMPA BANCO SQLITE REAL
+    try {
+      const clearResult = await databaseService.clearDatabase();
+      if (clearResult.success) {
+        console.log('🧹 Dados locais limpos do SQLite (REAL)');
+      } else {
+        console.error('❌ Erro ao limpar SQLite:', clearResult.error);
+      }
+    } catch (dbError) {
+      console.error('Erro ao limpar banco local:', dbError);
+    }
+
+    console.log('✅ Logout realizado com sucesso');
+  } catch (error) {
+    console.error('Erro ao fazer logout:', error);
+  }
+};
+
+// =====================================================
+// 🆕 FUNÇÕES ADICIONAIS PARA SINCRONIZAÇÃO REAL
+// =====================================================
+
+/**
+ * Força sincronização dos dados (AGORA REAL)
+ */
+export const forceSync = async (): Promise<boolean> => {
+  try {
+    const token = await getToken();
+    const email = await getUserEmail();
+    
+    if (!token || !email) {
+      throw new Error('Usuário não autenticado');
+    }
+
+    console.log('🔄 Forçando sincronização...');
+    return await syncPostgreSQLToSQLite(email, token);
+  } catch (error) {
+    console.error('❌ Erro na sincronização forçada:', error);
+    return false;
+  }
+};
+
+/**
+ * Verifica status da sincronização (AGORA REAL)
+ */
+export const getSyncStatus = async () => {
+  const isConnected = await checkConnection();
+  
+  // 🟢 AGORA USA DATABASE SERVICE REAL
+  const hasData = await hasLocalData();
+  const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
+
+  // 🟢 BUSCA ESTATÍSTICAS REAIS DO BANCO
+  let stats = null;
+  try {
+    const statsResult = await databaseService.getDatabaseStats();
+    if (statsResult.success) {
+      stats = statsResult.data;
+    }
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas:', error);
+  }
+
+  return {
+    isConnected,
+    hasLocalData: hasData,
+    lastSync,
+    canWorkOffline: hasData,
+    databaseStats: stats
+  };
+};
+
+/**
+ * Obtém informações do banco local (AGORA REAL)
+ */
+export const getDatabaseInfo = async () => {
+  try {
+    const infoResult = await databaseService.getDatabaseInfo();
+    return infoResult;
+  } catch (error) {
+    console.error('Erro ao buscar info do banco:', error);
+    return { success: false, error: 'Falha ao buscar informações' };
+  }
+};
+
+// =====================================================
+// 🔧 FUNÇÕES ORIGINAIS (MANTIDAS)
+// =====================================================
+
 export const getToken = async (): Promise<string | null> => {
   try {
-    // Primeiro tenta o AsyncStorage (compatibilidade)
-    let token = await AsyncStorage.getItem(TOKEN_KEY);
-    
-    // Token apenas do AsyncStorage
-    
-    return token;
+    return await AsyncStorage.getItem(TOKEN_KEY);
   } catch (error) {
     console.error('Erro ao obter token:', error);
     return null;
   }
 };
 
-// =====================================================
-// 3️⃣ FUNÇÃO PARA OBTER ID DO USUÁRIO
-// =====================================================
 export const getUserId = async (): Promise<number | null> => {
   try {
     const userId = await AsyncStorage.getItem(USER_ID_KEY);
@@ -68,9 +383,6 @@ export const getUserId = async (): Promise<number | null> => {
   }
 };
 
-// =====================================================
-// 4️⃣ FUNÇÃO PARA OBTER EMAIL DO USUÁRIO
-// =====================================================
 export const getUserEmail = async (): Promise<string | null> => {
   try {
     return await AsyncStorage.getItem(EMAIL_KEY);
@@ -81,7 +393,7 @@ export const getUserEmail = async (): Promise<string | null> => {
 };
 
 // =====================================================
-// 5️⃣ FUNÇÃO PARA REQUISIÇÕES AUTENTICADAS (Atualizada para incluir workspace)
+// 5️⃣ FUNÇÃO PARA REQUISIÇÕES AUTENTICADAS
 // =====================================================
 export const apiCall = async (
   endpoint: string,
@@ -92,13 +404,11 @@ export const apiCall = async (
   const token = await getToken();
   const email = await getUserEmail();
   
-  // Só logar se houver token (evitar spam após logout)
   if (token) {
-    console.log(`📡 apiCall ${method} ${endpoint} - Token existe:`, !!token, 'Email:', email);
+    console.log(`📡 apiCall ${method} ${endpoint} - Token:`, !!token, 'Email:', email);
   }
 
   if (!token) {
-    // Silenciar erro após logout
     throw new Error('Token não encontrado. Faça login novamente.');
   }
 
@@ -109,15 +419,13 @@ export const apiCall = async (
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    'X-User-Email': email, // Incluir email no header
+    'X-User-Email': email,
   };
 
-  // Para FormData, não definir Content-Type (deixar o fetch definir automaticamente)
   if (!(body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
-  // Incluir workspace ID no header se necessário
   if (includeWorkspace) {
     const workspaceId = await getActiveWorkspaceId();
     if (workspaceId) {
@@ -131,23 +439,17 @@ export const apiCall = async (
   };
 
   if (body) {
-    if (body instanceof FormData) {
-      config.body = body; // FormData vai como está
-    } else {
-      config.body = JSON.stringify(body); // JSON normal
-    }
+    config.body = body instanceof FormData ? body : JSON.stringify(body);
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, config);
 
-  // SE TOKEN EXPIROU (401)
   if (response.status === 401) {
     console.error('❌ Token expirado (401) para requisição:', endpoint);
-    await logout(); // Limpar storage
+    await logout();
     throw new Error('Token expirado. Faça login novamente.');
   }
 
-  // SE NÃO TEM PERMISSÃO (403)
   if (response.status === 403) {
     const errorData = await response.json();
     throw new Error(errorData.error || 'Você não tem permissão para realizar esta ação.');
@@ -193,51 +495,6 @@ export const getWorkspaceByEmail = async (email: string) => {
   } catch (error) {
     console.error('Erro ao buscar workspace por email:', error);
     throw error;
-  }
-};
-
-// =====================================================
-// 7️⃣ OBTER WORKSPACES DO USUÁRIO LOGADO
-// =====================================================
-// =====================================================
-// 🔒 FUNÇÃO DE LOGIN OFFLINE (SIMPLIFICADA)
-// =====================================================
-export const loginOffline = async () => {
-  try {
-    // Buscar token e dados salvos no AsyncStorage
-    const token = await AsyncStorage.getItem(TOKEN_KEY);
-    const email = await AsyncStorage.getItem(EMAIL_KEY);
-
-    if (!token || !email) {
-      return { sucesso: false, erro: 'Nenhum login anterior encontrado' };
-    }
-
-    return {
-      sucesso: true,
-      token,
-      email,
-      modo: 'offline'
-    };
-
-  } catch (error) {
-    console.error('Erro no login offline:', error);
-    return { sucesso: false, erro: 'Falha ao fazer login offline' };
-  }
-};
-
-export const logout = async (): Promise<void> => {
-  try {
-    await AsyncStorage.multiRemove([
-      TOKEN_KEY, 
-      EMAIL_KEY, 
-      USER_ID_KEY, 
-      ACTIVE_WORKSPACE_KEY, 
-      ACTIVE_WORKSPACE_NAME_KEY
-    ]);
-    
-    // Token limpo apenas do AsyncStorage
-  } catch (error) {
-    console.error('Erro ao fazer logout:', error);
   }
 };
 
@@ -338,14 +595,13 @@ export const clearActiveWorkspace = async (): Promise<void> => {
 };
 
 // =====================================================
-// 🏠 VERIFICAR SE USUÁRIO TEM WORKSPACE (Rota correta do backend)
+// 🏠 VERIFICAR SE USUÁRIO TEM WORKSPACE
 // =====================================================
 export const getUserWorkspaces = async () => {
   try {
     const token = await getToken();
     const email = await getUserEmail();
     
-    // Só logar se houver token (evitar spam após logout)
     if (token) {
       console.log('🔍 getUserWorkspaces - Token existe:', !!token);
       console.log('🔍 getUserWorkspaces - Email:', email);
@@ -509,7 +765,7 @@ export const buscarComentariosPorAutor = async (email_autor: string) => {
 export const buscarWorkspacePorId = async (id_workspace: number): Promise<any> => {
   try {
     const response = await apiCall(`/workspaces/id/${id_workspace}`, 'GET');
-    return response; // Agora retorna: { id_workspace, nome, equipe, criador, emails }
+    return response;
   } catch (error) {
     console.error('Erro ao buscar workspace por ID:', error);
     throw error;
@@ -589,7 +845,6 @@ export const comprarItemLojinha = async (valorItem: number): Promise<boolean> =>
       throw new Error('Pontos insuficientes');
     }
     
-    // ✅ Usar rota real do backend para remover pontos
     const response = await apiCall('/usuarios/remover-pontos', 'POST', { 
       pontos: valorItem 
     });
@@ -601,7 +856,3 @@ export const comprarItemLojinha = async (valorItem: number): Promise<boolean> =>
     return false;
   }
 };
-
-
-
-
