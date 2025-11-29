@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { databaseService } from './databaseService';
 import { loginOfflineService } from './loginOffline';
 import { getToken, getUserEmail } from './authService';
+import networkinManager from './networkinManager';
 
 const { SyncService } = NativeModules;
 
@@ -70,13 +71,37 @@ class SyncManager {
    * Configura monitoramento de rede
    */
   private setupNetworkMonitoring() {
-    // Escuta mudanças de rede do SyncService Java
-    // TODO: Implementar eventos de rede do Java quando disponíveis
+    try {
+      // Usar networkinManager para detectar mudanças de estado
+      const networkListener = {
+        onOnline: () => {
+          const wasOffline = !this.isOnline;
+          this.isOnline = true;
+          
+          if (wasOffline) {
+            console.log('🌐 Reconectado! Processando fila de sincronização...');
+            this.processSyncQueue();
+          }
+        },
+        onOffline: () => {
+          this.isOnline = false;
+          console.log('📴 Conexão perdida - modo offline ativado');
+        },
+        onNetworkChange: (networkState: any) => {
+          // Atualizar apenas estado local, o networkinManager já gerencia o estado dele
+          console.log('📡 Mudança de rede detectada:', networkState.isOnline ? 'Online' : 'Offline');
+        }
+      };
+      
+      networkinManager.addListener(networkListener);
+    } catch (error) {
+      console.error('❌ Erro ao configurar listener de rede:', error);
+    }
     
-    // Por enquanto verifica periodicamente
+    // Verificação periódica adicional
     setInterval(() => {
       this.checkConnection();
-    }, 30000); // A cada 30 segundos
+    }, 60000); // A cada 1 minuto (reduzido de 30s)
   }
 
   /**
@@ -368,23 +393,64 @@ class SyncManager {
         };
       }
 
-      console.log('🔄 Iniciando sincronização completa...');
+      console.log('🔄 Iniciando sincronização completa do PostgreSQL para SQLite...');
 
-      // Usa a lógica do authService para sync completo
-      const { forceSync } = await import('./authService');
-      const syncSuccess = await forceSync();
+      // Buscar dados completos do backend
+      const response = await fetch(`http://192.168.15.14:3000/sync/initial-data/${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-User-Email': email
+        }
+      });
 
-      if (syncSuccess) {
-        return {
-          success: true,
-          message: 'Sincronização completa realizada com sucesso'
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Falha na sincronização completa'
-        };
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
+
+      const data = await response.json();
+      console.log('📊 Dados recebidos do backend:', {
+        workspaces: data.workspaces?.length || 0,
+        categorias: data.categorias?.length || 0,
+        tarefas: data.tarefas?.length || 0,
+        comentarios: data.comentarios?.length || 0,
+        anexos: data.anexos?.length || 0
+      });
+
+      // Salvar todos os dados no SQLite de uma vez (método otimizado)
+      // Adicionar email do usuário aos dados para criar as associações usuário-workspace
+      const dataWithUser = {
+        ...data,
+        user_email: email
+      };
+
+      const result = await databaseService.saveFullSyncData(dataWithUser);
+      
+      if (!result.success) {
+        throw new Error(`Erro ao salvar dados no SQLite: ${result.error}`);
+      }
+
+      console.log('✅ Dados salvos no SQLite com sucesso');
+
+      // Marcar que temos dados locais
+      await AsyncStorage.setItem('has_local_data', 'true');
+      await AsyncStorage.setItem('last_sync_timestamp', new Date().toISOString());
+
+      // Calcular total de itens sincronizados
+      const totalItems = (data.workspaces?.length || 0) + 
+                        (data.categorias?.length || 0) + 
+                        (data.tarefas?.length || 0) + 
+                        (data.comentarios?.length || 0) + 
+                        (data.anexos?.length || 0);
+
+      console.log(`🎉 Sincronização completa finalizada! ${totalItems} itens salvos no SQLite`);
+
+      return {
+        success: true,
+        message: `Sincronização completa realizada com sucesso. ${totalItems} itens sincronizados.`
+      };
 
     } catch (error: any) {
       console.error('❌ Erro na sincronização completa:', error);

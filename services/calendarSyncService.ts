@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
-import { apiCall, getActiveWorkspaceId } from './authService';
+import { apiCall, getActiveWorkspaceId, getToken, getUserEmail } from './authService';
 import GoogleCalendarService from './googleCalendarService';
 
 interface TarefaCalendar {
@@ -89,9 +89,19 @@ class CalendarSyncService {
 
   private async loadTasksWithDeadlines(): Promise<TarefaCalendar[]> {
     try {
+      // Verificar se usuário está autenticado antes de tentar carregar tarefas
+      const token = await getToken();
+      const email = await getUserEmail();
+      
+      if (!token || !email) {
+        // Usuário não está logado, retornar array vazio silenciosamente
+        return [];
+      }
+
       const workspaceId = await getActiveWorkspaceId();
       if (!workspaceId) {
-        throw new Error('Nenhum workspace ativo encontrado');
+        // Não há workspace ativo, retornar array vazio silenciosamente
+        return [];
       }
 
       const response = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
@@ -102,11 +112,7 @@ class CalendarSyncService {
         tarefa.status !== 'concluido'
       );
     } catch (error) {
-      // Silenciar erro de token expirado para não poluir logs
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      if (!errorMessage.includes('Token expirado')) {
-        console.error('Erro ao carregar tarefas:', error);
-      }
+      // Silenciar completamente erros antes do login para não poluir logs
       return [];
     }
   }

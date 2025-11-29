@@ -16,6 +16,9 @@ import TarefaMultiplaInterface from './tarefaMultiplaInterface';
 import GerenciarPermissoesModal from '../permissoes/GerenciarPermissoesModal';
 import { confirmarDeletarComentario } from '../comentario/dellComentario';
 import AnexoService, {AnexoTarefa} from '../../services/anexoService';
+import networkinManager from '../../services/networkinManager';
+import databaseService from '../../services/databaseService';
+import syncManager from '../../services/syncManager';
 
 type VisualizaTarefaNavigationProp = StackNavigationProp<RootStackParamList, 'VisualizaTarefa'>;
 type VisualizaTarefaRouteProp = RouteProp<RootStackParamList, 'VisualizaTarefa'>;
@@ -95,15 +98,21 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       setWorkspaceId(id);
 
       if (id) {
-        try {
-          console.log('🏢 Buscando informações do workspace:', id);
-          const workspaceInfo = await apiCall(`/workspaces/id/${id}`, 'GET');
-          console.log('🏢 Workspace info recebido:', workspaceInfo);
-          // Usar o campo 'equipe' (boolean) da interface WorkspaceInterface
-          setWorkspaceEquipe(workspaceInfo.equipe || false);
-        } catch (error) {
-          console.log('❌ Erro ao buscar info do workspace:', error);
-          setWorkspaceEquipe(false);
+        const isOnline = networkinManager.checkOnlineStatus();
+        
+        if (isOnline) {
+          try {
+            console.log('🏢 Buscando informações do workspace online:', id);
+            const workspaceInfo = await apiCall(`/workspaces/id/${id}`, 'GET');
+            console.log('🏢 Workspace info recebido:', workspaceInfo);
+            setWorkspaceEquipe(workspaceInfo.equipe || false);
+          } catch (error) {
+            console.log('❌ Erro ao buscar info do workspace online:', error);
+            setWorkspaceEquipe(false);
+          }
+        } else {
+          console.log('📴 Modo offline - usando configurações padrão do workspace');
+          setWorkspaceEquipe(true); // Assumir permissões padrão offline
         }
       }
     } catch (error) {
@@ -112,8 +121,61 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     }
   };
 
+  const carregarTarefaOffline = async (): Promise<TarefaCompleta> => {
+    try {
+      if (!id_tarefa) {
+        throw new Error('ID da tarefa não fornecido');
+      }
+      
+      console.log('📱 [VisualizaTarefa] Carregando tarefa offline por ID:', id_tarefa);
+      
+      // Primeiro, vamos listar todas as tarefas para debug
+      console.log('🔍 [DEBUG] Listando todas as tarefas no SQLite...');
+      await databaseService.listarTodasTarefasSQLite();
+      
+      // Buscar tarefa específica por ID
+      const result = await databaseService.getTarefaById(id_tarefa);
+
+      console.log('📱 [VisualizaTarefa] Resultado getTarefaById:', JSON.stringify(result, null, 2));
+
+      if (result.success && result.data) {
+        console.log('✅ [VisualizaTarefa] Tarefa encontrada offline:', {
+          id: result.data.id_tarefa,
+          titulo: result.data.titulo,
+          id_workspace: result.data.id_workspace,
+          categorias: result.data.categorias?.length || 0,
+          dados_completos: result.data
+        });
+
+        // Retornar tarefa com estrutura mínima necessária
+        const tarefaCompleta: TarefaCompleta = {
+          ...result.data,
+          categorias: result.data.categorias || [],
+          pode_editar: true,
+          pode_apagar: true,
+          nivel_acesso: 'full' as const
+        };
+        
+        return tarefaCompleta;
+      } else {
+        console.error('❌ [VisualizaTarefa] Tarefa não encontrada:', {
+          id_procurado: id_tarefa,
+          erro: result.error,
+          resultado_completo: result
+        });
+        throw new Error(`Tarefa ID ${id_tarefa} não encontrada offline: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error('❌ [VisualizaTarefa] Erro detalhado ao carregar tarefa offline:', error);
+      throw new Error(`Tarefa não disponível offline: ${error.message}`);
+    }
+  };
+
   const carregarTarefa = async () => {
+    console.log('🔍 Iniciando carregarTarefa com:', { id_tarefa, workspaceId, titulo });
+    
     if (!workspaceId) {
+      console.log('❌ Workspace ID não disponível');
       return;
     }
 
@@ -122,19 +184,42 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
       let tarefaData: TarefaCompleta;
 
       if (id_tarefa) {
+        const isOnline = networkinManager.checkOnlineStatus();
+        
+        if (isOnline) {
+          try {
+            // Tentar carregar online
+            const todasTarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
+            const tarefaEncontrada = todasTarefas.find((t: TarefaCompleta) => t.id_tarefa === id_tarefa);
+            if (!tarefaEncontrada) {
+              throw new Error('Tarefa não encontrada');
+            }
+            tarefaData = tarefaEncontrada;
 
-        const todasTarefas = await apiCall(`/tarefas/workspace/${workspaceId}`, 'GET');
-        const tarefaEncontrada = todasTarefas.find((t: TarefaCompleta) => t.id_tarefa === id_tarefa);
-        if (!tarefaEncontrada) {
-          throw new Error('Tarefa não encontrada');
-        }
-        tarefaData = tarefaEncontrada;
-
-        try {
-          const categorias = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
-          tarefaData = { ...tarefaData, categorias };
-        } catch (catErr) {
-          tarefaData = { ...tarefaData, categorias: [] };
+            try {
+              const categorias = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
+              tarefaData = { ...tarefaData, categorias };
+            } catch (catErr) {
+              tarefaData = { ...tarefaData, categorias: [] };
+            }
+          } catch (apiError) {
+            console.log('📴 Falha na API, tentando carregar offline...');
+            try {
+              tarefaData = await carregarTarefaOffline();
+            } catch (offlineError) {
+              console.error('❌ Erro ao carregar tarefa offline:', offlineError);
+              throw new Error('Tarefa não disponível offline');
+            }
+          }
+        } else {
+          // Modo offline
+          console.log('📴 Modo offline - carregando tarefa do SQLite');
+          try {
+            tarefaData = await carregarTarefaOffline();
+          } catch (offlineError) {
+            console.error('❌ Erro ao carregar tarefa offline:', offlineError);
+            throw new Error('Tarefa não disponível offline');
+          }
         }
 
         if (tarefaData.nivel_acesso === undefined && tarefaData.pode_editar === false && tarefaData.pode_apagar === false) {
@@ -187,16 +272,29 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
   const carregarComentarios = async (idTarefa: number) => {
     setLoadingComentarios(true);
     try {
-      const comentariosData = await apiCall(`/comentarios/tarefa/${idTarefa}`);
-      console.log('📝 Comentários carregados:', comentariosData);
-      if (comentariosData && comentariosData.length > 0) {
-        console.log('🔍 Primeiro comentário completo:', JSON.stringify(comentariosData[0], null, 2));
+      const isOnline = networkinManager.checkOnlineStatus();
+      
+      if (isOnline) {
+        try {
+          // Tentar carregar online
+          const comentariosData = await apiCall(`/comentarios/tarefa/${idTarefa}`);
+          console.log('📝 [VisualizaTarefa] Comentários carregados online:', comentariosData?.length || 0);
+          if (comentariosData && comentariosData.length > 0) {
+            console.log('🔍 [VisualizaTarefa] Primeiro comentário:', JSON.stringify(comentariosData[0], null, 2));
+          }
+          setComentarios(comentariosData || []);
+          setTemComentarios(comentariosData && comentariosData.length > 0);
+          return comentariosData || [];
+        } catch (error) {
+          console.log('📴 [VisualizaTarefa] Falha ao carregar comentários online, tentando offline:', error);
+          return await carregarComentariosOffline(idTarefa);
+        }
+      } else {
+        console.log('📴 [VisualizaTarefa] Modo offline - carregando comentários do SQLite');
+        return await carregarComentariosOffline(idTarefa);
       }
-      setComentarios(comentariosData || []);
-      setTemComentarios(comentariosData && comentariosData.length > 0);
-      return comentariosData || [];
     } catch (error) {
-      console.error('Erro ao carregar comentários:', error);
+      console.error('❌ [VisualizaTarefa] Erro ao carregar comentários:', error);
       setComentarios([]);
       setTemComentarios(false);
       return [];
@@ -205,13 +303,51 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     }
   };
 
+  const carregarComentariosOffline = async (idTarefa: number) => {
+    try {
+      const result = await databaseService.getComentariosByTarefa(idTarefa);
+      
+      if (result.success && result.data) {
+        console.log('📝 [VisualizaTarefa] Comentários carregados offline:', result.data.length);
+        setComentarios(result.data);
+        setTemComentarios(result.data.length > 0);
+        return result.data;
+      } else {
+        console.log('📴 [VisualizaTarefa] Nenhum comentário encontrado offline');
+        setComentarios([]);
+        setTemComentarios(false);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ [VisualizaTarefa] Erro ao carregar comentários offline:', error);
+      setComentarios([]);
+      setTemComentarios(false);
+      return [];
+    }
+  };
+
   const carregarAnexos = async (idTarefa: number) => {
     setLoadingAnexos(true);
     try {
-      const anexosData = await AnexoService.listarAnexos(idTarefa);
-      setAnexos(anexosData);
+      const isOnline = networkinManager.checkOnlineStatus();
+      
+      if (isOnline) {
+        try {
+          // Tentar carregar online
+          const anexosData = await AnexoService.listarAnexos(idTarefa);
+          console.log('📎 [VisualizaTarefa] Anexos carregados online:', anexosData?.length || 0);
+          setAnexos(anexosData || []);
+        } catch (error) {
+          console.log('📴 [VisualizaTarefa] Falha ao carregar anexos online, usando dados offline:', error);
+          // Fallback offline - retornar array vazio por enquanto
+          setAnexos([]);
+        }
+      } else {
+        console.log('📴 [VisualizaTarefa] Modo offline - anexos não disponíveis');
+        setAnexos([]);
+      }
     } catch (error) {
-      console.error('Erro ao carregar anexos:', error);
+      console.error('❌ [VisualizaTarefa] Erro ao carregar anexos:', error);
       setAnexos([]);
     } finally {
       setLoadingAnexos(false);
@@ -274,6 +410,74 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
     }
     const date = new Date(data);
     return date.toLocaleDateString('pt-BR');
+  };
+
+  const marcarComoConcluida = async () => {
+    await atualizarStatusTarefa('concluido', true);
+  };
+
+  const marcarComoNaoConcluida = async () => {
+    await atualizarStatusTarefa('a_fazer', false);
+  };
+
+  const atualizarStatusTarefa = async (novoStatus: string, concluida: boolean) => {
+    try {
+      const dadosAtualizacao = {
+        status: novoStatus,
+        concluida: concluida
+      };
+
+      const isOnline = networkinManager.checkOnlineStatus();
+      
+      if (isOnline) {
+        try {
+          // Tentar atualizar online
+          await apiCall(`/tarefas/${tarefa!.id_tarefa}`, 'PUT', dadosAtualizacao);
+          
+          // Atualizar estado local
+          setTarefa(prev => prev ? { ...prev, status: novoStatus as any, concluida } : null);
+          
+          Alert.alert('Sucesso', 'Status da tarefa atualizado!');
+        } catch (apiError) {
+          console.log('📴 Falha na API, salvando offline...');
+          await salvarAtualizacaoOffline(dadosAtualizacao);
+        }
+      } else {
+        // Modo offline
+        await salvarAtualizacaoOffline(dadosAtualizacao);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar status:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar o status da tarefa');
+    }
+  };
+
+  const salvarAtualizacaoOffline = async (dadosAtualizacao: any) => {
+    try {
+      // Atualizar tarefa no SQLite local
+      const resultUpdate = await databaseService.updateTarefa(tarefa!.id_tarefa, dadosAtualizacao);
+      
+      if (resultUpdate.success) {
+        console.log('✅ Status da tarefa atualizado no SQLite local');
+      } else {
+        console.warn('⚠️ Falha ao atualizar no SQLite local:', resultUpdate.error);
+      }
+
+      // TODO: Adicionar à fila de sincronização quando implementarmos
+      console.log('📋 [VisualizaTarefa] Dados marcados para sincronização:', dadosAtualizacao);
+      
+      // Atualizar estado local
+      setTarefa(prev => prev ? { ...prev, ...dadosAtualizacao } : null);
+      
+      Alert.alert(
+        '📴 Salvo Offline',
+        'A alteração foi salva localmente e será sincronizada quando você estiver online.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('❌ Erro ao salvar offline:', error);
+      throw error;
+    }
   };
 
   if (loading) {
@@ -509,6 +713,23 @@ const VisualizaTarefa: React.FC<VisualizaTarefaProps> = ({ navigation, route }) 
             activeOpacity={0.7}>
             <Text style={styles.novoComentarioButtonText}>💬 Novo Comentário</Text>
           </TouchableOpacity>
+          
+          {/* Botão para marcar como concluída/não concluída */}
+          {!tarefa.concluida ? (
+            <TouchableOpacity
+              style={[styles.novoComentarioButton, styles.concluirButton]}
+              onPress={marcarComoConcluida}
+              activeOpacity={0.7}>
+              <Text style={styles.novoComentarioButtonText}>✅ Marcar como Concluída</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.novoComentarioButton, styles.reabrirButton]}
+              onPress={marcarComoNaoConcluida}
+              activeOpacity={0.7}>
+              <Text style={styles.novoComentarioButtonText}>↩️ Reabrir Tarefa</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {}
@@ -1030,6 +1251,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+
+  concluirButton: {
+    backgroundColor: '#28a745',
+  },
+
+  reabrirButton: {
+    backgroundColor: '#fd7e14',
   },
 
 });

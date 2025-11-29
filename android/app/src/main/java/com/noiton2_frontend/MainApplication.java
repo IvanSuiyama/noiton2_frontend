@@ -5,7 +5,7 @@ import com.facebook.react.PackageList;
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactNativeHost;
 import com.facebook.react.ReactPackage;
-import com.facebook.react.ReactApplicationContext;
+// import com.facebook.react.ReactApplicationContext; // Removido - não é necessário aqui
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint;
 import com.facebook.react.defaults.DefaultReactNativeHost;
 import com.facebook.soloader.SoLoader;
@@ -14,15 +14,15 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 
-// 1. IMPORTAR SEUS PACOTES MANUAIS
-import com.noiton2_frontend.calendar.CalendarPackage;
-import com.noiton2_frontend.filepicker.FilePickerPackage;
-import com.noiton2_frontend.notification.NotificationPackage;
-import com.noiton2_frontend.googlesignin.GoogleSignInPackage;
+// 1. IMPORTAR SEUS PACOTES MANUAIS (corrigidos)
+import com.noiton2_frontend.CalendarPackage;
+import com.noiton2_frontend.FilePickerPackage;
+import com.noiton2_frontend.NotificationPackage;
+import com.noiton2_frontend.GoogleSignInPackage;
 
-// 2. IMPORTAR O NOVO SYNC SERVICE
-import com.noiton2_frontend.sync.SyncService;
+// 2. IMPORTAR DATABASE HELPER E SYNC PACKAGE
 import com.noiton2_frontend.database.DatabaseHelper;
+import com.noiton2_frontend.SyncPackage;
 
 public class MainApplication extends Application implements ReactApplication {
 
@@ -44,21 +44,8 @@ public class MainApplication extends Application implements ReactApplication {
           packages.add(new NotificationPackage());
           packages.add(new GoogleSignInPackage());
           
-          // 4. ADICIONAR NOSSO NOVO PACOTE COM SYNC SERVICE
-          packages.add(new ReactPackage() {
-            @Override
-            public List<com.facebook.react.uimanager.ViewManager> createViewManagers(ReactApplicationContext reactContext) {
-              return Collections.emptyList();
-            }
-
-            @Override
-            public List<com.facebook.react.bridge.NativeModule> createNativeModules(ReactApplicationContext reactContext) {
-              List<com.facebook.react.bridge.NativeModule> modules = new ArrayList<>();
-              // Registrar nosso SyncService como Native Module
-              modules.add(new SyncService(reactContext));
-              return modules;
-            }
-          });
+          // 4. ADICIONAR SYNC SERVICE
+          packages.add(new SyncPackage());
 
           return packages;
         }

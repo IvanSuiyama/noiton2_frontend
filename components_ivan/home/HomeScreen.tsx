@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  Animated
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../router';
@@ -20,6 +21,8 @@ import CardMembros from '../cards/cardMembros';
 import CardDashboardSmall from '../cards/cardDashboardSmall';
 import CardLojinha from '../cards/CardLojinha';
 import CardAjuda from '../cards/CardAjuda';
+import { networkMonitor } from '../../services/networkinManager'; // ADICIONE ESTA IMPORT
+import { databaseService } from '../../services/databaseService';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -34,7 +37,51 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState<number | null>(null);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState(true); // MANTIDO O ESTADO ORIGINAL
+  const [bannerAnimation] = useState(new Animated.Value(0)); // ADICIONADO
+
+  // ADICIONE ESTE useEffect PARA O SISTEMA OFFLINE
+  useEffect(() => {
+    const networkListener = {
+      onNetworkChange: (status: any) => {
+        setIsConnected(status.isOnline);
+        
+        // Anima o banner
+        Animated.timing(bannerAnimation, {
+          toValue: status.isOnline ? 0 : 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      },
+      onOnline: () => {
+        setIsConnected(true);
+        Animated.timing(bannerAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      },
+      onOffline: () => {
+        setIsConnected(false);
+        Animated.timing(bannerAnimation, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    };
+
+    // Adiciona listener do networkMonitor
+    networkMonitor.addListener(networkListener);
+
+    // Verifica status inicial da rede
+    networkMonitor.checkNetworkStatus();
+
+    // Cleanup
+    return () => {
+      networkMonitor.removeListener(networkListener);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchWorkspaceId = async () => {
@@ -78,8 +125,31 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // ADICIONE ESTES ESTILOS PARA O BANNER OFFLINE
+  const bannerStyle = {
+    transform: [{
+      translateY: bannerAnimation.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-50, 0],
+      }),
+    }],
+    opacity: bannerAnimation,
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* ADICIONE ESTE BANNER OFFLINE */}
+      {!isConnected && (
+        <Animated.View style={[
+          styles.offlineBanner,
+          bannerStyle,
+          { backgroundColor: theme.colors.error || '#FF3B30' }
+        ]}>
+          <Text style={styles.offlineText}>🔴 Você está offline</Text>
+          <Text style={styles.offlineSubText}>Algumas funcionalidades podem estar limitadas</Text>
+        </Animated.View>
+      )}
+      
       {/* Componente invisível de monitoramento de conectividade */}
      
       
@@ -222,6 +292,32 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  // ADICIONE ESTES ESTILOS PARA O BANNER OFFLINE
+  offlineBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    zIndex: 1000,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  offlineSubText: {
+    color: 'white',
+    fontSize: 12,
+    opacity: 0.9,
+    textAlign: 'center',
+    marginTop: 2,
   },
 
   topHeader: {

@@ -18,6 +18,8 @@ import {
   getUserEmail,
 } from '../../services/authService';
 import WorkspaceInterface from '../workspace/workspaceInterface';
+import { databaseService } from '../../services/databaseService';
+import { networkMonitor } from '../../services/networkinManager';
 import { useTheme } from '../theme/ThemeContext';
 import { useIcons } from '../icons/IconContext';
 
@@ -60,20 +62,44 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
   const initializeWorkspaceData = async () => {
     try {
       setLoading(true);
-      const [email, workspaces, wsId] = await Promise.all([
-        getUserEmail(),
-        getUserWorkspaces(),
-        getActiveWorkspaceId()
-      ]);
+      const email = await getUserEmail();
+      const wsId = await getActiveWorkspaceId();
       setUserEmail(email || '');
-      setUserWorkspaces(workspaces || []);
       setActiveWorkspaceId(wsId);
+
+      const isOnline = await networkMonitor.checkNetworkStatus();
+      let workspaces: WorkspaceInterface[] = [];
+
+      if (isOnline) {
+        // Modo online - buscar da API
+        try {
+          console.log('🏢 Carregando workspaces online...');
+          workspaces = await getUserWorkspaces() || [];
+          
+          // Os workspaces são salvos automaticamente pelo processo de sincronização
+        } catch (error) {
+          console.error('Erro ao carregar workspaces online:', error);
+          // Fallback para dados offline se API falhar
+          if (email) {
+            workspaces = await loadOfflineWorkspaces(email);
+          }
+        }
+      } else {
+        // Modo offline - buscar do SQLite
+        console.log('🏢 Carregando workspaces offline...');
+        if (email) {
+          workspaces = await loadOfflineWorkspaces(email);
+        }
+      }
+
+      setUserWorkspaces(workspaces);
+      
       if (workspaces && workspaces.length > 0) {
         // Busca workspace ativo pelo id
         const workspaceAtivo = workspaces.find((ws: WorkspaceInterface) => ws.id_workspace === wsId) || workspaces[0];
         setActiveWorkspaceState(workspaceAtivo);
         setWorkspaceName(workspaceAtivo.nome);
-        setActiveWorkspaceId(workspaceAtivo.id_workspace);
+        setActiveWorkspaceId(workspaceAtivo.id_workspace || null);
         // Notificar o HomeScreen sobre o workspace ativo
         if (onWorkspaceChange) {
           onWorkspaceChange(workspaceAtivo);
@@ -88,6 +114,21 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
       Alert.alert('Erro', 'Não foi possível carregar os workspaces');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOfflineWorkspaces = async (email: string): Promise<WorkspaceInterface[]> => {
+    try {
+      const result = await databaseService.getWorkspacesByUser(email);
+      if (result.success && Array.isArray(result.data)) {
+        console.log('🏢 Workspaces carregados do cache offline:', result.data.length);
+        return result.data;
+      }
+      console.log('🏢 Nenhum workspace offline encontrado');
+      return [];
+    } catch (error) {
+      console.error('Erro ao carregar workspaces offline:', error);
+      return [];
     }
   };
 
@@ -123,8 +164,26 @@ const CardWorkspace: React.FC<CardWorkspaceProps> = ({ navigation, onWorkspaceCh
 
   const refreshWorkspaces = async () => {
     try {
-      const workspaces = await getUserWorkspaces();
-      setUserWorkspaces(workspaces || []);
+      const isOnline = await networkMonitor.checkNetworkStatus();
+      let workspaces: WorkspaceInterface[] = [];
+
+      if (isOnline) {
+        try {
+          workspaces = await getUserWorkspaces() || [];
+          // Os workspaces são salvos automaticamente pelo processo de sincronização
+        } catch (error) {
+          console.error('Erro ao atualizar workspaces online:', error);
+          if (userEmail) {
+            workspaces = await loadOfflineWorkspaces(userEmail);
+          }
+        }
+      } else {
+        if (userEmail) {
+          workspaces = await loadOfflineWorkspaces(userEmail);
+        }
+      }
+
+      setUserWorkspaces(workspaces);
     } catch (error) {
       console.error('Erro ao atualizar workspaces:', error);
     }

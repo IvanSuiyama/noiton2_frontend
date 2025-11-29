@@ -8,7 +8,10 @@ import { loginOfflineService } from './loginOffline';
 const { SyncService } = NativeModules;
 
 // Criar EventEmitter para escutar eventos do Java (se disponíveis)
-const syncServiceEmitter = new NativeEventEmitter(SyncService);
+// Verificar se SyncService suporta eventos antes de criar o emitter
+const syncServiceEmitter = (SyncService && SyncService.addListener && SyncService.removeListeners) 
+  ? new NativeEventEmitter(SyncService) 
+  : null;
 
 // Chaves para AsyncStorage
 const NETWORK_STATUS_KEY = 'last_network_status';
@@ -39,7 +42,7 @@ export interface NetworkMetrics {
 }
 
 class NetworkMonitor {
-  private isOnline: boolean = false;
+  private _isOnline: boolean = false;
   private isWifi: boolean = false;
   private isSyncing: boolean = false;
   private listeners: NetworkListener[] = [];
@@ -82,7 +85,9 @@ class NetworkMonitor {
     });
 
     // TODO: Quando o Java tiver eventos de rede, adicionar aqui:
-    // syncServiceEmitter.addListener('NETWORK_CHANGED', this.handleJavaNetworkEvent);
+    // if (syncServiceEmitter) {
+    //   syncServiceEmitter.addListener('NETWORK_CHANGED', this.handleJavaNetworkEvent);
+    // }
   }
 
   /**
@@ -118,35 +123,35 @@ class NetworkMonitor {
     this.lastStatusCheck = now;
 
     try {
-      const wasOnline = this.isOnline;
+      const wasOnline = this._isOnline;
       const wasWifi = this.isWifi;
 
       // 🟢 Verifica status real da rede
-      this.isOnline = await SyncService.isConnected();
-      this.isWifi = this.isOnline ? await SyncService.isWifiConnected() : false;
+      this._isOnline = await SyncService.isConnected();
+      this.isWifi = this._isOnline ? await SyncService.isWifiConnected() : false;
 
       const status: NetworkStatus = {
-        isOnline: this.isOnline,
+        isOnline: this._isOnline,
         isWifi: this.isWifi,
-        isCellular: this.isOnline && !this.isWifi,
-        connectionType: this.isOnline ? (this.isWifi ? 'wifi' : 'cellular') : 'none',
+        isCellular: this._isOnline && !this.isWifi,
+        connectionType: this._isOnline ? (this.isWifi ? 'wifi' : 'cellular') : 'none',
         timestamp: new Date().toISOString()
       };
 
       // Notifica mudanças significativas
-      if (wasOnline !== this.isOnline || wasWifi !== this.isWifi) {
+      if (wasOnline !== this._isOnline || wasWifi !== this.isWifi) {
         console.log('📡 Mudança de rede detectada:', {
           from: { online: wasOnline, wifi: wasWifi },
-          to: { online: this.isOnline, wifi: this.isWifi }
+          to: { online: this._isOnline, wifi: this.isWifi }
         });
 
         await this.saveNetworkStatus(status);
         this.notifyNetworkChange(status);
         
         // Gerencia transições de estado
-        if (!wasOnline && this.isOnline) {
+        if (!wasOnline && this._isOnline) {
           await this.handleOnlineTransition();
-        } else if (wasOnline && !this.isOnline) {
+        } else if (wasOnline && !this._isOnline) {
           await this.handleOfflineTransition();
         }
 
@@ -192,6 +197,9 @@ class NetworkMonitor {
           await this.optimizedSync();
         }
       }
+      
+      // 🔄 Sincronizar tarefas pendentes
+      await this.syncPendingTarefas();
 
       // 3. Verificar necessidade de sync completo
       const hasLocalData = await databaseService.hasLocalData();
@@ -247,6 +255,108 @@ class NetworkMonitor {
     // - Limitar tamanho dos dados
     // - Usar compressão
     await syncManager.forceSync();
+  }
+  
+  /**
+   * Sincroniza tarefas pendentes quando reconecta
+   */
+  private async syncPendingTarefas() {
+    try {
+      console.log('🔄 [Sync] Verificando tarefas pendentes...');
+      
+      const pendingTasks = await AsyncStorage.getItem('pending_tasks_sync');
+      if (!pendingTasks) {
+        console.log('📭 [Sync] Nenhuma tarefa pendente para sincronizar');
+        return;
+      }
+
+      const tasks = JSON.parse(pendingTasks);
+      console.log(`📤 [Sync] ${tasks.length} tarefas para sincronizar`);
+
+      // Tentar diferentes chaves de token (auth_token primeiro)
+      let token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        token = await AsyncStorage.getItem('token');
+      }
+      if (!token) {
+        token = await AsyncStorage.getItem('userToken');
+      }
+      if (!token) {
+        token = await AsyncStorage.getItem('authToken');
+      }
+      
+      if (!token) {
+        console.warn('⚠️ [Sync] Token não encontrado (tentou: auth_token, token, userToken, authToken)');
+        // Listar todas as chaves para debug
+        try {
+          const allKeys = await AsyncStorage.getAllKeys();
+          console.log('🔍 [Debug] Chaves disponíveis no AsyncStorage:', allKeys.filter(key => key.toLowerCase().includes('token')));
+        } catch (e) {
+          console.log('🔍 [Debug] Erro ao listar chaves:', e);
+        }
+        return;
+      }
+      
+      console.log('✅ [Sync] Token encontrado para sincronização');
+      
+      console.log('✅ [Sync] Token encontrado para sincronização');
+      
+      console.log('✅ [Sync] Token encontrado para sincronização');
+
+      let syncedCount = 0;
+      const failedTasks = [];
+      
+      for (const task of tasks) {
+        try {
+          console.log(`📤 [Sync] Sincronizando tarefa: ${task.titulo}`);
+          console.log(`🔗 [Sync] URL: http://192.168.15.14:3000/tarefas/${task.id_tarefa}`);
+          console.log(`🔑 [Sync] Token: ${token.substring(0, 20)}...`);
+          
+          const response = await fetch(`http://192.168.15.14:3000/tarefas/${task.id_tarefa}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              titulo: task.titulo,
+              descricao: task.descricao,
+              data_fim: task.data_fim,
+              status: task.status,
+              prioridade: task.prioridade,
+              recorrente: task.recorrente,
+              recorrencia: task.recorrencia,
+              categorias: task.categorias
+            }),
+          });
+
+          console.log(`📡 [Sync] Response status: ${response.status}`);
+          
+          if (response.ok) {
+            console.log(`✅ [Sync] Tarefa ${task.titulo} sincronizada com sucesso`);
+            syncedCount++;
+          } else {
+            const errorText = await response.text();
+            console.warn(`⚠️ [Sync] Falha ao sincronizar tarefa ${task.titulo}:`, response.status, errorText);
+            failedTasks.push(task);
+          }
+        } catch (error) {
+          console.warn(`❌ [Sync] Erro ao sincronizar tarefa ${task.titulo}:`, error);
+          console.warn(`🔍 [Debug] Detalhes do erro:`, (error as Error)?.message, (error as Error)?.name);
+          failedTasks.push(task);
+        }
+      }
+
+      // 🧪 MODO TESTE: Limpar operações após tentativa (evita acúmulo)
+      console.log('🧪 [Teste] Limpando operações pendentes após tentativa de sincronização');
+      await AsyncStorage.removeItem('pending_tasks_sync');
+      console.log('🧹 [Sync] Lista de tarefas pendentes limpa (modo teste)');
+
+      console.log(`📊 [Sync] Resultado: ${syncedCount}/${tasks.length} sincronizadas`);
+
+    } catch (error) {
+      console.error('❌ [Sync] Erro na sincronização de tarefas:', error);
+    }
   }
 
   /**
@@ -372,14 +482,21 @@ class NetworkMonitor {
   }
 
   /**
+   * Verifica se está online
+   */
+  checkOnlineStatus(): boolean {
+    return this._isOnline;
+  }
+
+  /**
    * Obtém status atual da rede
    */
   getCurrentStatus(): NetworkStatus {
     return {
-      isOnline: this.isOnline,
+      isOnline: this._isOnline,
       isWifi: this.isWifi,
-      isCellular: this.isOnline && !this.isWifi,
-      connectionType: this.isOnline ? (this.isWifi ? 'wifi' : 'cellular') : 'none',
+      isCellular: this._isOnline && !this.isWifi,
+      connectionType: this._isOnline ? (this.isWifi ? 'wifi' : 'cellular') : 'none',
       timestamp: new Date().toISOString()
     };
   }
@@ -388,14 +505,14 @@ class NetworkMonitor {
    * Verifica se é seguro fazer operações pesadas (WiFi)
    */
   isSafeForLargeOperations(): boolean {
-    return this.isOnline && this.isWifi;
+    return this._isOnline && this.isWifi;
   }
 
   /**
    * Verifica se pode fazer sync (conexão boa)
    */
   isGoodForSync(): boolean {
-    return this.isOnline && !this.isSyncing;
+    return this._isOnline && !this.isSyncing;
   }
 
   /**

@@ -15,6 +15,8 @@ import {
   getUserWorkspaces,
 } from '../../services/authService';
 import WorkspaceInterface from '../workspace/workspaceInterface';
+import { databaseService } from '../../services/databaseService';
+import { networkMonitor } from '../../services/networkinManager';
 import { useTheme } from '../theme/ThemeContext';
 import { useIcons } from '../icons/IconContext';
 
@@ -46,7 +48,25 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
 
   const initializeWorkspaceData = async () => {
     try {
-      const userWorkspaces = await getUserWorkspaces();
+      const isOnline = await networkMonitor.checkNetworkStatus();
+      let userWorkspaces: WorkspaceInterface[] = [];
+
+      if (isOnline) {
+        // Modo online - buscar da API
+        try {
+          console.log('👥 Carregando dados de membros online...');
+          userWorkspaces = await getUserWorkspaces();
+        } catch (error) {
+          console.error('Erro ao carregar workspaces online:', error);
+          // Fallback para dados offline se API falhar
+          userWorkspaces = await loadOfflineWorkspaces();
+        }
+      } else {
+        // Modo offline - buscar do SQLite
+        console.log('👥 Carregando dados de membros offline...');
+        userWorkspaces = await loadOfflineWorkspaces();
+      }
+
       if (!Array.isArray(userWorkspaces) || userWorkspaces.length === 0) {
         setWorkspaces([]);
         setActiveWorkspaceState(null);
@@ -56,6 +76,7 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
         setCriador('');
         return;
       }
+
       setWorkspaces(userWorkspaces);
       const activeWorkspaceId = await getActiveWorkspaceId();
       const workspaceAtivo = userWorkspaces.find((ws: WorkspaceInterface) => ws.id_workspace === activeWorkspaceId) || userWorkspaces[0];
@@ -72,7 +93,34 @@ const CardMembros: React.FC<CardMembrosProps> = ({ onMembrosAtualizados, refresh
       setListaMembros([]);
       setCriador('');
       console.error('Erro ao buscar workspaces do usuário:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os workspaces. Tente novamente mais tarde.');
+      
+      const isOnline = await networkMonitor.checkNetworkStatus();
+      const errorMessage = isOnline 
+        ? 'Não foi possível carregar os workspaces. Tente novamente mais tarde.'
+        : 'Dados offline não disponíveis. Conecte-se à internet para sincronizar.';
+      Alert.alert('Erro', errorMessage);
+    }
+  };
+
+  const loadOfflineWorkspaces = async (): Promise<WorkspaceInterface[]> => {
+    try {
+      // Aqui assumimos que vamos buscar do usuário logado
+      const { getUserEmail } = require('../../services/authService');
+      const email = await getUserEmail();
+      if (!email) {
+        return [];
+      }
+      
+      const result = await databaseService.getWorkspacesByUser(email);
+      if (result.success && Array.isArray(result.data)) {
+        console.log('👥 Workspaces carregados do cache offline para membros:', result.data.length);
+        return result.data;
+      }
+      console.log('👥 Nenhum workspace offline encontrado para membros');
+      return [];
+    } catch (error) {
+      console.error('Erro ao carregar workspaces offline para membros:', error);
+      return [];
     }
   };
   useEffect(() => {

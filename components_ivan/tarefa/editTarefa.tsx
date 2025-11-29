@@ -13,6 +13,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RouteProp} from '@react-navigation/native';
 import {RootStackParamList} from '../router';
@@ -21,6 +22,9 @@ import {apiCall, getActiveWorkspaceId} from '../../services/authService';
 import CalendarSyncService from '../../services/calendarSyncService';
 import AnexoService, {AnexoTarefa} from '../../services/anexoService';
 import { useNotifications } from '../../hooks/useNotifications';
+import networkinManager from '../../services/networkinManager';
+import syncManager from '../../services/syncManager';
+import databaseService from '../../services/databaseService';
 
 type EditTarefaNavigationProp = StackNavigationProp<RootStackParamList>;
 type EditTarefaRouteProp = RouteProp<RootStackParamList, 'EditTarefa'>;
@@ -123,11 +127,38 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
     }
   }, [formData.id_tarefa]);
 
+  const carregarTarefaOfflineEdit = async () => {
+    try {
+      console.log('📱 [EditTarefa] Carregando tarefa offline para edição, ID:', id_tarefa);
+      
+      // Primeiro, vamos listar todas as tarefas para debug
+      console.log('🔍 [DEBUG] Listando todas as tarefas no SQLite...');
+      await databaseService.listarTodasTarefasSQLite();
+      
+      const result = await databaseService.getTarefaById(id_tarefa);
+
+      if (result.success && result.data) {
+        console.log('✅ [EditTarefa] Tarefa encontrada offline:', {
+          id: result.data.id_tarefa,
+          titulo: result.data.titulo,
+          id_workspace: result.data.id_workspace,
+          dados_completos: result.data
+        });
+        return result.data;
+      } else {
+        console.error('❌ [EditTarefa] Tarefa não encontrada:', result.error);
+        throw new Error(`Tarefa ID ${id_tarefa} não encontrada offline: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error('❌ [EditTarefa] Erro ao carregar tarefa offline:', error);
+      throw new Error(`Tarefa não disponível offline: ${error.message}`);
+    }
+  };
+
   const carregarDadosTarefa = async () => {
     setLoadingTarefa(true);
     try {
       // Primeiro, buscar o id_workspace ativo se não estiver definido
-
       let idWorkspace: number = formData.id_workspace;
       if (!idWorkspace) {
         // Se não estiver no formData, tente buscar do serviço
@@ -137,8 +168,22 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
         }
         idWorkspace = ws;
       }
-      // Buscar tarefa pela rota correta
-      const tarefa = await apiCall(`/tarefas/workspace/${idWorkspace}/tarefa/${id_tarefa}`, 'GET');
+
+      let tarefa;
+      const isOnline = networkinManager.checkOnlineStatus();
+      
+      if (isOnline) {
+        try {
+          // Buscar tarefa online pela rota correta
+          tarefa = await apiCall(`/tarefas/workspace/${idWorkspace}/tarefa/${id_tarefa}`, 'GET');
+        } catch (apiError) {
+          console.log('📴 Falha na API, tentando carregar offline...');
+          tarefa = await carregarTarefaOfflineEdit();
+        }
+      } else {
+        console.log('📴 Modo offline - carregando tarefa do SQLite');
+        tarefa = await carregarTarefaOfflineEdit();
+      }
       
       // Verificar permissão para editar
       if (tarefa && tarefa.pode_editar === false) {
@@ -152,11 +197,17 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
 
       // Buscar categorias associadas à tarefa
       let categoriasTarefa = [];
-      try {
-        const categoriasResponse = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
-        categoriasTarefa = categoriasResponse.map((cat: any) => cat.id_categoria);
-      } catch (error) {
-        console.log('Nenhuma categoria encontrada para a tarefa:', error);
+      if (isOnline) {
+        try {
+          const categoriasResponse = await apiCall(`/tarefas/${id_tarefa}/categorias`, 'GET');
+          categoriasTarefa = categoriasResponse.map((cat: any) => cat.id_categoria);
+        } catch (error) {
+          console.log('Erro ao carregar categorias da tarefa online:', error);
+          categoriasTarefa = tarefa.categorias || [];
+        }
+      } else {
+        console.log('📴 Modo offline - usando categorias do cache');
+        categoriasTarefa = tarefa.categorias || [];
       }
 
       const tarefaFormatada: TarefaData = {
@@ -186,38 +237,80 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
 
   const carregarCategorias = async () => {
     try {
-      const categorias = await apiCall(
-        `/categorias/workspace/${formData.id_workspace}`,
-        'GET',
-      );
-      setCategoriasDisponiveis(categorias);
+      const isOnline = networkinManager.checkOnlineStatus();
+      
+      if (isOnline) {
+        try {
+          // Tentar carregar online
+          const categorias = await apiCall(
+            `/categorias/workspace/${formData.id_workspace}`,
+            'GET',
+          );
+          console.log('🏷️ [EditTarefa] Categorias carregadas online:', categorias.length);
+          setCategoriasDisponiveis(categorias);
+        } catch (error) {
+          console.log('📴 [EditTarefa] Falha ao carregar categorias online, tentando offline:', error);
+          await carregarCategoriasOffline();
+        }
+      } else {
+        console.log('📴 [EditTarefa] Modo offline - carregando categorias do SQLite');
+        await carregarCategoriasOffline();
+      }
     } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
-      // Usar categorias mockadas em caso de erro
+      console.error('❌ [EditTarefa] Erro ao carregar categorias:', error);
+      setCategoriasDisponiveis([]);
+    }
+  };
+
+  const carregarCategoriasOffline = async () => {
+    try {
+      const result = await databaseService.getCategoriasByWorkspace(formData.id_workspace);
+      
+      if (result.success && result.data) {
+        console.log('🏷️ [EditTarefa] Categorias carregadas offline:', result.data.length);
+        setCategoriasDisponiveis(result.data);
+      } else {
+        console.log('📴 [EditTarefa] Nenhuma categoria encontrada offline');
+        setCategoriasDisponiveis([]);
+      }
+    } catch (error) {
+      console.error('❌ [EditTarefa] Erro ao carregar categorias offline:', error);
+      setCategoriasDisponiveis([]);
     }
   };
 
   // Função para carregar anexos da tarefa
   const carregarAnexos = async () => {
-    console.log('🔄 Carregando anexos para tarefa:', formData.id_tarefa);
+    console.log('🔄 [EditTarefa] Carregando anexos para tarefa:', formData.id_tarefa);
     
     if (!formData.id_tarefa) {
-      console.log('⚠️ ID da tarefa não está definido');
+      console.log('⚠️ [EditTarefa] ID da tarefa não está definido');
       return;
     }
     
     setLoadingAnexos(true);
     try {
-      const anexosList = await AnexoService.listarAnexos(formData.id_tarefa);
+      const isOnline = networkinManager.checkOnlineStatus();
       
-      console.log('📎 Resultado do service:', anexosList);
-      console.log('📎 Tipo do resultado:', typeof anexosList);
-      console.log('📎 É array:', Array.isArray(anexosList));
-      console.log('📎 Quantidade de anexos:', anexosList?.length || 0);
-      
-      setAnexos(anexosList);
+      if (isOnline) {
+        try {
+          // Tentar carregar online
+          const anexosList = await AnexoService.listarAnexos(formData.id_tarefa);
+          
+          console.log('📎 [EditTarefa] Anexos carregados online:', anexosList?.length || 0);
+          setAnexos(anexosList || []);
+        } catch (error) {
+          console.log('📴 [EditTarefa] Falha ao carregar anexos online, usando dados offline:', error);
+          // Fallback offline - retornar array vazio por enquanto
+          setAnexos([]);
+        }
+      } else {
+        console.log('📴 [EditTarefa] Modo offline - anexos não disponíveis');
+        setAnexos([]);
+      }
     } catch (error) {
-      console.error('❌ Erro ao carregar anexos:', error);
+      console.error('❌ [EditTarefa] Erro ao carregar anexos:', error);
+      setAnexos([]);
     } finally {
       setLoadingAnexos(false);
     }
@@ -347,6 +440,88 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Função para salvar tarefa offline
+  const salvarTarefaOffline = async (dadosEnvio: any) => {
+    try {
+      console.log('💾 Salvando tarefa offline:', dadosEnvio);
+      console.log('🔍 [Debug] Valores de recorrência - recorrente:', formData.recorrente, 'recorrencia:', dadosEnvio.recorrencia);
+      
+      // Preparar dados específicos para SQLite (SEM campos de recorrência)
+      const dadosParaSQLite = {
+        titulo: dadosEnvio.titulo,
+        descricao: dadosEnvio.descricao,
+        data_fim: dadosEnvio.data_fim,
+        status: dadosEnvio.status,
+        prioridade: dadosEnvio.prioridade
+        // 🚫 NÃO incluir recorrente/recorrencia no update - deixar como está no banco
+      };
+      
+      console.log('🗃️ [Debug] Dados preparados para SQLite:', dadosParaSQLite);
+      
+      // Atualizar tarefa no SQLite local
+      const resultUpdate = await databaseService.updateTarefa(id_tarefa, dadosParaSQLite);
+      console.log('🗃️ [Debug] Resultado update SQLite:', resultUpdate);
+      
+      if (resultUpdate.success) {
+        console.log('✅ Tarefa atualizada no SQLite local');
+      } else {
+        console.warn('⚠️ Falha ao atualizar no SQLite local:', resultUpdate.error);
+      }
+
+      // Dados completos incluindo categorias para fila de sincronização
+      const dadosCompletos = {
+        ...dadosEnvio,
+        categorias: formData.categorias_selecionadas,
+        id_tarefa: id_tarefa,
+        id_workspace: formData.id_workspace
+      };
+
+      // 🔄 Adicionar à fila de sincronização
+      console.log('📋 [EditTarefa] Tarefa marcada para sincronização futura:', dadosCompletos);
+      
+      try {
+        // Salvar na fila de sincronização
+        const pendingTasks = await AsyncStorage.getItem('pending_tasks_sync');
+        const tasks = pendingTasks ? JSON.parse(pendingTasks) : [];
+        
+        // Verificar se já existe uma alteração pendente para esta tarefa
+        const existingIndex = tasks.findIndex((t: any) => t.id_tarefa === id_tarefa);
+        if (existingIndex >= 0) {
+          // Substituir alteração existente
+          tasks[existingIndex] = dadosCompletos;
+          console.log('🔄 Alteração de tarefa existente atualizada na fila');
+        } else {
+          // Adicionar nova alteração
+          tasks.push(dadosCompletos);
+          console.log('➕ Nova alteração adicionada à fila de sincronização');
+        }
+        
+        await AsyncStorage.setItem('pending_tasks_sync', JSON.stringify(tasks));
+        console.log('📋 Tarefa adicionada à fila de sincronização offline');
+      } catch (error) {
+        console.warn('⚠️ Erro ao salvar na fila de sincronização:', error);
+      }
+      
+      Alert.alert(
+        '✅ Salvo Offline',
+        'Suas alterações foram salvas localmente e serão sincronizadas quando você estiver online.',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Voltar para a tela anterior após salvar
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('❌ Erro ao salvar offline:', error);
+      Alert.alert('Erro', 'Falha ao salvar alterações offline.');
+      throw error;
+    }
+  };
+
   const atualizarTarefa = async (): Promise<void> => {
     if (!validarFormulario()) {
       return;
@@ -354,59 +529,72 @@ const EditTarefa: React.FC<EditTarefaProps> = ({navigation, route}) => {
 
     setLoading(true);
     try {
-      // Preparar dados para envio (sem as categorias)
+      // Preparar dados para envio (SEM campos de recorrência)
       const dadosEnvio = {
         titulo: formData.titulo,
         descricao: formData.descricao,
         data_fim: formData.data_fim || null,
         status: formData.status,
-        prioridade: formData.prioridade,
-        recorrente: formData.recorrente,
-        recorrencia: formData.recorrente ? formData.recorrencia : null,
+        prioridade: formData.prioridade
+        // 🚫 NÃO enviar recorrente/recorrencia - deixar como está
       };
 
-      // Atualizar dados básicos da tarefa
-      await apiCall(`/tarefas/${id_tarefa}`, 'PUT', dadosEnvio);
+      const isOnline = networkinManager.checkOnlineStatus();
+      
+      if (isOnline) {
+        // Modo online - tentar API
+        try {
+          // Atualizar dados básicos da tarefa
+          await apiCall(`/tarefas/${id_tarefa}`, 'PUT', dadosEnvio);
 
-      // Atualizar categorias associadas (sempre sobrescreve)
-      await apiCall(
-        `/tarefas/${id_tarefa}/categorias`,
-        'POST',
-        { categorias: formData.categorias_selecionadas }
-      );
-
-      // Integração com Google Calendar para atualização
-      try {
-        // Se a tarefa foi concluída, registrar conclusão
-        if (formData.status === 'concluido' && tarefaOriginal?.status !== 'concluido') {
-          await CalendarSyncService.completeSingleTask({
-            id: formData.id_tarefa,
-            titulo: formData.titulo,
-            descricao: formData.descricao
-          });
-        } else {
-          // Se foi apenas editada, registrar edição
-          await CalendarSyncService.updateSingleTask({
-            id: formData.id_tarefa,
-            titulo: formData.titulo,
-            descricao: formData.descricao,
-            data_fim: formData.data_fim
-          });
-        }
-
-
-
-        // Se mudou para recorrente, criar evento de recorrência
-        if (formData.recorrente && formData.recorrencia && 
-            (!tarefaOriginal?.recorrente || formData.recorrencia !== tarefaOriginal?.recorrencia)) {
-          console.log('Recorrência atualizada:', // Método removido
-            `� ${formData.titulo} (Recorrência Atualizada)`,
-            formData.recorrencia
+          // Atualizar categorias associadas (sempre sobrescreve)
+          await apiCall(
+            `/tarefas/${id_tarefa}/categorias`,
+            'POST',
+            { categorias: formData.categorias_selecionadas }
           );
+          
+          console.log('✅ Tarefa atualizada online com sucesso');
+          
+          // Integração com Google Calendar apenas quando online
+          try {
+            // Se a tarefa foi concluída, registrar conclusão
+            if (formData.status === 'concluido' && tarefaOriginal?.status !== 'concluido') {
+              await CalendarSyncService.completeSingleTask({
+                id: formData.id_tarefa,
+                titulo: formData.titulo,
+                descricao: formData.descricao
+              });
+            } else {
+              // Se foi apenas editada, registrar edição
+              await CalendarSyncService.updateSingleTask({
+                id: formData.id_tarefa,
+                titulo: formData.titulo,
+                descricao: formData.descricao,
+                data_fim: formData.data_fim
+              });
+            }
+          } catch (calendarError) {
+            console.log('Erro ao atualizar eventos no calendário:', calendarError);
+          }
+          
+          Alert.alert(
+            'Sucesso!', 
+            'Tarefa atualizada com sucesso.',
+            [{ 
+              text: 'OK', 
+              onPress: () => navigation.goBack()
+            }]
+          );
+        } catch (apiError) {
+          console.log('📴 Falha na API, salvando offline...');
+          // Se API falhar, salvar offline
+          await salvarTarefaOffline(dadosEnvio);
         }
-      } catch (calendarError) {
-        console.log('Erro ao atualizar eventos no calendário:', calendarError);
-        // Não interromper o fluxo se houver erro no calendário
+      } else {
+        // Modo offline - salvar na fila de sincronização
+        console.log('📴 Modo offline - salvando para sincronização posterior');
+        await salvarTarefaOffline(dadosEnvio);
       }
 
       // Notificação push para tarefa editada

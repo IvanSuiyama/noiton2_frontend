@@ -13,6 +13,8 @@ import {
   getUserEmail,
   apiCall,
 } from '../../services/authService';
+import { databaseService } from '../../services/databaseService';
+import { networkMonitor } from '../../services/networkinManager';
 import ThemeSelector from '../theme/ThemeSelector';
 import { useTheme } from '../theme/ThemeContext';
 import { useIcons } from '../icons/IconContext';
@@ -52,17 +54,60 @@ const CardUser: React.FC<CardUserProps> = ({ navigation }) => {
       setUserName(email?.split('@')[0] || 'Usuário');
 
       if (email) {
-        try {
-          const userData = await apiCall(`/usuarios/email/${encodeURIComponent(email)}`);
-          setUserFullName(userData.nome || userName);
-          setUserPhone(userData.telefone || '');
-        } catch (error) {
-          console.error('Erro ao buscar dados completos do usuário:', error);
-          setUserFullName(userName);
+        const isOnline = await networkMonitor.checkNetworkStatus();
+        
+        if (isOnline) {
+          // Modo online - buscar da API
+          try {
+            console.log('👤 Carregando dados do usuário online...');
+            const userData = await apiCall(`/usuarios/email/${encodeURIComponent(email)}`);
+            setUserFullName(userData.nome || userName);
+            setUserPhone(userData.telefone || '');
+            
+            // Salvar no cache local para uso offline
+            try {
+              await databaseService.saveUsuario({
+                email: email,
+                nome: userData.nome || userName,
+                telefone: userData.telefone || ''
+              });
+            } catch (cacheError) {
+              console.warn('Erro ao salvar usuário no cache:', cacheError);
+            }
+          } catch (error) {
+            console.error('Erro ao buscar dados do usuário online:', error);
+            // Fallback para dados offline se API falhar
+            await loadOfflineUserData(email);
+          }
+        } else {
+          // Modo offline - buscar do SQLite
+          console.log('👤 Carregando dados do usuário offline...');
+          await loadOfflineUserData(email);
         }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do usuário:', error);
+    }
+  };
+
+  const loadOfflineUserData = async (email: string) => {
+    try {
+      const result = await databaseService.getUsuarioByEmail(email);
+      if (result.success && result.data) {
+        const userData = result.data;
+        setUserFullName(userData.nome || userName);
+        setUserPhone(userData.telefone || '');
+        console.log('👤 Dados do usuário carregados do cache offline');
+      } else {
+        // Se não há dados offline, usar dados básicos do email
+        setUserFullName(userName);
+        setUserPhone('');
+        console.log('👤 Nenhum dado offline encontrado, usando dados básicos');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados offline do usuário:', error);
+      setUserFullName(userName);
+      setUserPhone('');
     }
   };
 

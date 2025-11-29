@@ -13,7 +13,10 @@ import {
   apiCall,
   getActiveWorkspaceId,
   getActiveWorkspaceName,
+  getUserEmail,
 } from '../../services/authService';
+import { databaseService } from '../../services/databaseService';
+import { networkMonitor } from '../../services/networkinManager';
 import TarefaMultiplaInterface from '../tarefa/tarefaMultiplaInterface';
 import { useTheme } from '../theme/ThemeContext';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -60,13 +63,52 @@ const HomeCard: React.FC<HomeCardProps> = ({ navigation }) => {
     }
   };
 
-  // Carregar informações do workspace (se é de equipe ou individual)
+  // Carregar informações do workspace (se é de equipe ou individual) - com suporte offline
   const carregarInfoWorkspace = async (wsId: number) => {
     try {
-      const response = await apiCall(`/workspaces/id/${wsId}`, 'GET');
-      setWorkspaceIsTeam(response.equipe || false);
+      const isOnline = await networkMonitor.checkNetworkStatus();
+      
+      if (isOnline) {
+        // Modo online - buscar da API
+        try {
+          const response = await apiCall(`/workspaces/id/${wsId}`, 'GET');
+          setWorkspaceIsTeam(response.equipe || false);
+        } catch (error) {
+          // Silenciosamente tentar fallback offline
+          await carregarInfoWorkspaceOffline(wsId);
+        }
+      } else {
+        // Modo offline - buscar do SQLite
+        await carregarInfoWorkspaceOffline(wsId);
+      }
     } catch (error) {
       console.error('Erro ao carregar informações do workspace:', error);
+      setWorkspaceIsTeam(false);
+    }
+  };
+
+  const carregarInfoWorkspaceOffline = async (wsId: number) => {
+    try {
+      const email = await getUserEmail();
+      if (!email) {
+        setWorkspaceIsTeam(false);
+        return;
+      }
+
+      const result = await databaseService.getWorkspacesByUser(email);
+      if (result.success && Array.isArray(result.data)) {
+        const workspace = result.data.find((ws: any) => ws.id_workspace === wsId);
+        if (workspace) {
+          setWorkspaceIsTeam(workspace.equipe || false);
+          console.log('🏠 Info do workspace carregada do cache offline');
+        } else {
+          setWorkspaceIsTeam(false);
+        }
+      } else {
+        setWorkspaceIsTeam(false);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar workspace offline:', error);
       setWorkspaceIsTeam(false);
     }
   };

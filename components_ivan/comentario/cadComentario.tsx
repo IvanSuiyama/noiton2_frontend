@@ -17,6 +17,8 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { apiCall } from '../../services/authService';
 import ComentarioInterface, { CreateComentarioInterface, EditComentarioInterface } from './comentarioInterface';
+import networkinManager from '../../services/networkinManager';
+import syncManager from '../../services/syncManager';
 
 interface RouteParams {
   id_tarefa: number;
@@ -53,6 +55,29 @@ const CadComentario: React.FC = () => {
     }
   };
 
+  const salvarComentarioOffline = async (dadosComentario: CreateComentarioInterface) => {
+    try {
+      // Adicionar à fila de sincronização
+      await syncManager.addToQueue({
+        action: 'CREATE',
+        entity: 'comentario',
+        data: dadosComentario
+      });
+      
+      setNovoComentario('');
+      console.log('💬 Comentário adicionado à fila de sincronização offline');
+      Alert.alert(
+        '📴 Salvo Offline',
+        'Seu comentário foi salvo localmente e será enviado quando você estiver online.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('❌ Erro ao salvar comentário offline:', error);
+      Alert.alert('Erro', 'Falha ao salvar comentário offline.');
+      throw error;
+    }
+  };
+
   const enviarComentario = async () => {
     if (!novoComentario.trim()) {
       Alert.alert('Atenção', 'Digite um comentário antes de enviar');
@@ -72,12 +97,26 @@ const CadComentario: React.FC = () => {
         descricao: novoComentario.trim()
       };
 
-      await apiCall('/comentarios', 'POST', dadosComentario);
+      const isOnline = networkinManager.checkOnlineStatus();
       
-      setNovoComentario('');
-      await carregarComentarios(); // Recarregar para mostrar o novo comentário
-      
-      Alert.alert('Sucesso', 'Comentário adicionado com sucesso!');
+      if (isOnline) {
+        try {
+          // Tentar enviar online
+          await apiCall('/comentarios', 'POST', dadosComentario);
+          
+          setNovoComentario('');
+          await carregarComentarios(); // Recarregar para mostrar o novo comentário
+          
+          Alert.alert('Sucesso', 'Comentário adicionado com sucesso!');
+        } catch (apiError) {
+          console.log('📴 Falha na API, salvando offline...');
+          await salvarComentarioOffline(dadosComentario);
+        }
+      } else {
+        // Modo offline
+        console.log('📴 Modo offline - salvando comentário para sincronização posterior');
+        await salvarComentarioOffline(dadosComentario);
+      }
     } catch (error: any) {
       console.error('Erro ao enviar comentário:', error);
       Alert.alert('Erro', 'Não foi possível enviar o comentário');

@@ -158,6 +158,18 @@ public class SyncService extends ReactContextBaseJavaModule {
                 }
             }
 
+            // 🟢 CRIAR ASSOCIAÇÕES USUÁRIO-WORKSPACE
+            // Quando sincronizamos, todos os workspaces retornados são do usuário logado
+            if (data.has("workspaces") && data.has("user_email")) {
+                String userEmail = data.getString("user_email");
+                JSONArray workspaces = data.getJSONArray("workspaces");
+                Log.i(TAG, "Criando " + workspaces.length() + " associações usuário-workspace para " + userEmail);
+                for (int i = 0; i < workspaces.length(); i++) {
+                    JSONObject workspace = workspaces.getJSONObject(i);
+                    saveUsuarioWorkspace(db, userEmail, workspace.getInt("id_workspace"));
+                }
+            }
+
             // 🟢 SALVAR CATEGORIAS (do seu backend)
             if (data.has("categorias")) {
                 JSONArray categorias = data.getJSONArray("categorias");
@@ -170,10 +182,43 @@ public class SyncService extends ReactContextBaseJavaModule {
             // 🟢 SALVAR TAREFAS (do seu backend)
             if (data.has("tarefas")) {
                 JSONArray tarefas = data.getJSONArray("tarefas");
-                Log.i(TAG, "Salvando " + tarefas.length() + " tarefas");
+                Log.i(TAG, "📋 Iniciando sincronização de " + tarefas.length() + " tarefas");
+                
                 for (int i = 0; i < tarefas.length(); i++) {
-                    saveTarefa(db, tarefas.getJSONObject(i));
+                    JSONObject tarefa = tarefas.getJSONObject(i);
+                    
+                    int idTarefa = tarefa.getInt("id_tarefa");
+                    String titulo = tarefa.getString("titulo");
+                    
+                    Log.i(TAG, "📋 [" + (i+1) + "/" + tarefas.length() + "] Copiando tarefa ID " + idTarefa + ": " + titulo);
+                    Log.i(TAG, "📋 Dados completos: " + tarefa.toString());
+                    
+                    // Salvar tarefa principal
+                    saveTarefa(db, tarefa);
+                    Log.i(TAG, "✅ Tarefa ID " + idTarefa + " salva no SQLite");
+                    
+                    // Criar associação tarefa-workspace se tiver id_workspace
+                    if (tarefa.has("id_workspace")) {
+                        int idWorkspace = tarefa.getInt("id_workspace");
+                        saveTarefaWorkspace(db, idTarefa, idWorkspace);
+                        Log.i(TAG, "🔗 Associação tarefa-workspace criada: tarefa " + idTarefa + " -> workspace " + idWorkspace);
+                    }
+                    
+                    // Criar associações tarefa-categoria se tiver categorias
+                    if (tarefa.has("categorias") && !tarefa.isNull("categorias")) {
+                        JSONArray categorias = tarefa.getJSONArray("categorias");
+                        Log.i(TAG, "🏷️ Associando " + categorias.length() + " categorias à tarefa " + idTarefa);
+                        for (int j = 0; j < categorias.length(); j++) {
+                            int idCategoria = categorias.getInt(j);
+                            saveTarefaCategoria(db, idTarefa, idCategoria);
+                            Log.i(TAG, "🏷️ Categoria " + idCategoria + " associada à tarefa " + idTarefa);
+                        }
+                    } else {
+                        Log.i(TAG, "ℹ️ Tarefa " + idTarefa + " sem categorias associadas");
+                    }
                 }
+                
+                Log.i(TAG, "✅ Sincronização de tarefas concluída: " + tarefas.length() + " tarefas processadas");
             }
 
             // 🟢 SALVAR COMENTÁRIOS (do seu backend)
@@ -236,6 +281,10 @@ public class SyncService extends ReactContextBaseJavaModule {
                     result = getTarefasByUser(db, data.getInt("userId"));
                     break;
                     
+                case "get_tarefa_by_id":
+                    result = getTarefaById(db, data.getInt("id"));
+                    break;
+                    
                 case "get_categorias_by_workspace":
                     result = getCategoriasByWorkspace(db, data.getInt("workspaceId"));
                     break;
@@ -252,6 +301,10 @@ public class SyncService extends ReactContextBaseJavaModule {
                     result = saveTarefaOperation(db, data);
                     break;
                     
+                case "update_tarefa":
+                    result = updateTarefaOperation(db, data);
+                    break;
+                    
                 case "save_comentario":
                     result = saveComentarioOperation(db, data);
                     break;
@@ -262,6 +315,14 @@ public class SyncService extends ReactContextBaseJavaModule {
                     
                 case "get_database_stats":
                     result = getDatabaseStatsOperation(db);
+                    break;
+                    
+                case "list_all_tarefas":
+                    result = listAllTarefas(db);
+                    break;
+                    
+                case "save_usuario":
+                    result = saveUsuarioOperation(db, data);
                     break;
                     
                 default:
@@ -386,6 +447,47 @@ public class SyncService extends ReactContextBaseJavaModule {
         db.insertWithOnConflict(DatabaseContract.TarefaEntry.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
+    // 🟢 ATUALIZAR TAREFA POR ID
+    private void updateTarefa(SQLiteDatabase db, JSONObject data) throws JSONException {
+        int id = data.getInt("id");
+        ContentValues values = new ContentValues();
+        
+        // Atualizar apenas os campos fornecidos
+        if (data.has("titulo") && !data.isNull("titulo")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_TITULO, data.getString("titulo"));
+        }
+        if (data.has("descricao")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_DESCRICAO, data.optString("descricao"));
+        }
+        if (data.has("data_fim")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_DATA_FIM, data.optString("data_fim"));
+        }
+        if (data.has("prioridade")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_PRIORIDADE, data.optString("prioridade"));
+        }
+        if (data.has("status")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_STATUS, data.optString("status"));
+        }
+        if (data.has("concluida")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_CONCLUIDA, data.getBoolean("concluida") ? 1 : 0);
+        }
+        if (data.has("recorrente")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_RECORRENTE, data.getBoolean("recorrente") ? 1 : 0);
+        }
+        if (data.has("recorrencia")) {
+            values.put(DatabaseContract.TarefaEntry.COLUMN_RECORRENCIA, data.optString("recorrencia"));
+        }
+
+        String whereClause = DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA + " = ?";
+        String[] whereArgs = {String.valueOf(id)};
+        
+        int rowsAffected = db.update(DatabaseContract.TarefaEntry.TABLE_NAME, values, whereClause, whereArgs);
+        
+        if (rowsAffected == 0) {
+            throw new RuntimeException("Tarefa não encontrada para atualizar: ID " + id);
+        }
+    }
+
     // 🟢 SALVAR COMENTÁRIO
     private void saveComentario(SQLiteDatabase db, JSONObject comentario) throws JSONException {
         ContentValues values = new ContentValues();
@@ -425,6 +527,33 @@ public class SyncService extends ReactContextBaseJavaModule {
         }
 
         db.insertWithOnConflict(DatabaseContract.AnexoEntry.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    // 🟢 SALVAR ASSOCIAÇÃO USUÁRIO-WORKSPACE
+    private void saveUsuarioWorkspace(SQLiteDatabase db, String email, int idWorkspace) throws JSONException {
+        ContentValues values = new ContentValues();
+        values.put(DatabaseContract.UsuarioWorkspaceEntry.COLUMN_EMAIL, email);
+        values.put(DatabaseContract.UsuarioWorkspaceEntry.COLUMN_ID_WORKSPACE, idWorkspace);
+        
+        db.insertWithOnConflict(DatabaseContract.UsuarioWorkspaceEntry.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    // 🟢 SALVAR ASSOCIAÇÃO TAREFA-WORKSPACE
+    private void saveTarefaWorkspace(SQLiteDatabase db, int idTarefa, int idWorkspace) throws JSONException {
+        ContentValues values = new ContentValues();
+        values.put(DatabaseContract.TarefaWorkspaceEntry.COLUMN_ID_TAREFA, idTarefa);
+        values.put(DatabaseContract.TarefaWorkspaceEntry.COLUMN_ID_WORKSPACE, idWorkspace);
+        
+        db.insertWithOnConflict(DatabaseContract.TarefaWorkspaceEntry.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    // 🟢 SALVAR ASSOCIAÇÃO TAREFA-CATEGORIA
+    private void saveTarefaCategoria(SQLiteDatabase db, int idTarefa, int idCategoria) throws JSONException {
+        ContentValues values = new ContentValues();
+        values.put(DatabaseContract.TarefaCategoriaEntry.COLUMN_ID_TAREFA, idTarefa);
+        values.put(DatabaseContract.TarefaCategoriaEntry.COLUMN_ID_CATEGORIA, idCategoria);
+        
+        db.insertWithOnConflict(DatabaseContract.TarefaCategoriaEntry.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
     // =====================================================
@@ -488,7 +617,29 @@ public class SyncService extends ReactContextBaseJavaModule {
                 tarefa.putString("titulo", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_TITULO)));
                 tarefa.putString("descricao", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_DESCRICAO)));
                 tarefa.putInt("id_usuario", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_USUARIO)));
-                // ... outros campos
+                tarefa.putInt("id_workspace", workspaceId); // ✅ Adicionar id_workspace ao resultado
+                
+                // Campos opcionais
+                int dataFimIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_DATA_FIM);
+                if (dataFimIndex >= 0 && !cursor.isNull(dataFimIndex)) {
+                    tarefa.putString("data_fim", cursor.getString(dataFimIndex));
+                }
+                
+                int prioridadeIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_PRIORIDADE);
+                if (prioridadeIndex >= 0 && !cursor.isNull(prioridadeIndex)) {
+                    tarefa.putString("prioridade", cursor.getString(prioridadeIndex));
+                }
+                
+                int statusIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_STATUS);
+                if (statusIndex >= 0 && !cursor.isNull(statusIndex)) {
+                    tarefa.putString("status", cursor.getString(statusIndex));
+                }
+                
+                int concluidaIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_CONCLUIDA);
+                if (concluidaIndex >= 0) {
+                    tarefa.putBoolean("concluida", cursor.getInt(concluidaIndex) == 1);
+                }
+                
                 tarefas.pushMap(tarefa);
             }
             
@@ -508,14 +659,443 @@ public class SyncService extends ReactContextBaseJavaModule {
         return result;
     }
 
-    // ... (implementar outros métodos de consulta similares)
+    private WritableMap getTarefasByUser(SQLiteDatabase db, int userId) {
+        WritableMap result = new WritableNativeMap();
+        Cursor cursor = null;
+        
+        try {
+            String query = "SELECT * FROM " + DatabaseContract.TarefaEntry.TABLE_NAME + " WHERE " + 
+                          DatabaseContract.TarefaEntry.COLUMN_ID_USUARIO + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
+            
+            WritableArray tarefas = new WritableNativeArray();
+            while (cursor.moveToNext()) {
+                WritableMap tarefa = new WritableNativeMap();
+                tarefa.putInt("id_tarefa", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA)));
+                tarefa.putString("titulo", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_TITULO)));
+                tarefa.putString("descricao", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_DESCRICAO)));
+                tarefa.putInt("id_usuario", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_USUARIO)));
+                tarefas.pushMap(tarefa);
+            }
+            
+            result.putBoolean("success", true);
+            result.putArray("data", tarefas);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao buscar tarefas por usuário: " + e.getMessage());
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 🔍 BUSCAR TAREFA POR ID ESPECÍFICO
+     * Método essencial para editTarefa e visualizaTarefa
+     */
+    private WritableMap getTarefaById(SQLiteDatabase db, int tarefaId) {
+        WritableMap result = new WritableNativeMap();
+        Cursor cursor = null;
+        
+        try {
+            Log.i(TAG, "🔍 Buscando tarefa por ID: " + tarefaId);
+            
+            // Query principal da tarefa com JOIN para pegar id_workspace
+            String query = "SELECT t.*, tw." + DatabaseContract.TarefaWorkspaceEntry.COLUMN_ID_WORKSPACE + " as id_workspace " +
+                          "FROM " + DatabaseContract.TarefaEntry.TABLE_NAME + " t " +
+                          "LEFT JOIN " + DatabaseContract.TarefaWorkspaceEntry.TABLE_NAME + " tw " +
+                          "ON t." + DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA + " = tw." + DatabaseContract.TarefaWorkspaceEntry.COLUMN_ID_TAREFA + " " +
+                          "WHERE t." + DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{String.valueOf(tarefaId)});
+            
+            if (cursor.moveToFirst()) {
+                WritableMap tarefa = new WritableNativeMap();
+                
+                // Campos obrigatórios
+                tarefa.putInt("id_tarefa", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA)));
+                tarefa.putString("titulo", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_TITULO)));
+                tarefa.putString("descricao", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_DESCRICAO)));
+                tarefa.putInt("id_usuario", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_USUARIO)));
+                
+                // ID do workspace
+                int workspaceIndex = cursor.getColumnIndex("id_workspace");
+                if (workspaceIndex >= 0 && !cursor.isNull(workspaceIndex)) {
+                    tarefa.putInt("id_workspace", cursor.getInt(workspaceIndex));
+                }
+                
+                // Campos opcionais
+                int dataFimIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_DATA_FIM);
+                if (dataFimIndex >= 0 && !cursor.isNull(dataFimIndex)) {
+                    tarefa.putString("data_fim", cursor.getString(dataFimIndex));
+                }
+                
+                int prioridadeIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_PRIORIDADE);
+                if (prioridadeIndex >= 0 && !cursor.isNull(prioridadeIndex)) {
+                    tarefa.putString("prioridade", cursor.getString(prioridadeIndex));
+                } else {
+                    tarefa.putString("prioridade", "media"); // valor padrão
+                }
+                
+                int statusIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_STATUS);
+                if (statusIndex >= 0 && !cursor.isNull(statusIndex)) {
+                    tarefa.putString("status", cursor.getString(statusIndex));
+                } else {
+                    tarefa.putString("status", "a_fazer"); // valor padrão
+                }
+                
+                int concluidaIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_CONCLUIDA);
+                if (concluidaIndex >= 0) {
+                    tarefa.putBoolean("concluida", cursor.getInt(concluidaIndex) == 1);
+                } else {
+                    tarefa.putBoolean("concluida", false);
+                }
+                
+                int recorrenteIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_RECORRENTE);
+                if (recorrenteIndex >= 0) {
+                    tarefa.putBoolean("recorrente", cursor.getInt(recorrenteIndex) == 1);
+                } else {
+                    tarefa.putBoolean("recorrente", false);
+                }
+                
+                int recorrenciaIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_RECORRENCIA);
+                if (recorrenciaIndex >= 0 && !cursor.isNull(recorrenciaIndex)) {
+                    tarefa.putString("recorrencia", cursor.getString(recorrenciaIndex));
+                }
+                
+                // Buscar categorias associadas
+                WritableArray categorias = getCategoriasByTarefaId(db, tarefaId);
+                tarefa.putArray("categorias", categorias);
+                
+                // Permissões padrão para modo offline
+                tarefa.putBoolean("pode_editar", true);
+                tarefa.putBoolean("pode_apagar", true);
+                tarefa.putString("nivel_acesso", "full");
+                
+                Log.i(TAG, "✅ Tarefa " + tarefaId + " encontrada: " + cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_TITULO)));
+                
+                result.putBoolean("success", true);
+                result.putMap("data", tarefa);
+            } else {
+                Log.w(TAG, "❌ Tarefa " + tarefaId + " não encontrada no SQLite");
+                result.putBoolean("success", false);
+                result.putString("error", "Tarefa não encontrada");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao buscar tarefa por ID " + tarefaId + ": " + e.getMessage());
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 🏷️ BUSCAR CATEGORIAS DE UMA TAREFA ESPECÍFICA
+     */
+    private WritableArray getCategoriasByTarefaId(SQLiteDatabase db, int tarefaId) {
+        WritableArray categorias = new WritableNativeArray();
+        Cursor cursor = null;
+        
+        try {
+            String query = "SELECT c.* FROM " + DatabaseContract.CategoriaEntry.TABLE_NAME + " c " +
+                          "INNER JOIN " + DatabaseContract.TarefaCategoriaEntry.TABLE_NAME + " tc " +
+                          "ON c." + DatabaseContract.CategoriaEntry.COLUMN_ID_CATEGORIA + " = tc." + DatabaseContract.TarefaCategoriaEntry.COLUMN_ID_CATEGORIA + " " +
+                          "WHERE tc." + DatabaseContract.TarefaCategoriaEntry.COLUMN_ID_TAREFA + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{String.valueOf(tarefaId)});
+            
+            while (cursor.moveToNext()) {
+                WritableMap categoria = new WritableNativeMap();
+                categoria.putInt("id_categoria", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.CategoriaEntry.COLUMN_ID_CATEGORIA)));
+                categoria.putString("nome", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.CategoriaEntry.COLUMN_NOME)));
+                categoria.putInt("id_workspace", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.CategoriaEntry.COLUMN_ID_WORKSPACE)));
+                categorias.pushMap(categoria);
+            }
+            
+            Log.i(TAG, "🏷️ Encontradas " + categorias.size() + " categorias para tarefa " + tarefaId);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao buscar categorias da tarefa " + tarefaId + ": " + e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return categorias;
+    }
+
+    /**
+     * 🗃️ LISTAR TODAS AS TAREFAS PARA DEBUG
+     * Usado para verificar quais tarefas estão no SQLite
+     */
+    private WritableMap listAllTarefas(SQLiteDatabase db) {
+        WritableMap result = new WritableNativeMap();
+        Cursor cursor = null;
+        
+        try {
+            Log.i(TAG, "🗃️ Listando TODAS as tarefas no SQLite para debug...");
+            
+            // Query para listar todas as tarefas com informações de workspace
+            String query = "SELECT t.*, tw." + DatabaseContract.TarefaWorkspaceEntry.COLUMN_ID_WORKSPACE + " as id_workspace " +
+                          "FROM " + DatabaseContract.TarefaEntry.TABLE_NAME + " t " +
+                          "LEFT JOIN " + DatabaseContract.TarefaWorkspaceEntry.TABLE_NAME + " tw " +
+                          "ON t." + DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA + " = tw." + DatabaseContract.TarefaWorkspaceEntry.COLUMN_ID_TAREFA;
+            
+            cursor = db.rawQuery(query, null);
+            
+            WritableArray tarefas = new WritableNativeArray();
+            int count = 0;
+            
+            while (cursor.moveToNext()) {
+                count++;
+                WritableMap tarefa = new WritableNativeMap();
+                
+                int idTarefa = cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_TAREFA));
+                String titulo = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_TITULO));
+                
+                tarefa.putInt("id_tarefa", idTarefa);
+                tarefa.putString("titulo", titulo);
+                tarefa.putString("descricao", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_DESCRICAO)));
+                tarefa.putInt("id_usuario", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.TarefaEntry.COLUMN_ID_USUARIO)));
+                
+                // ID do workspace se existir
+                int workspaceIndex = cursor.getColumnIndex("id_workspace");
+                if (workspaceIndex >= 0 && !cursor.isNull(workspaceIndex)) {
+                    tarefa.putInt("id_workspace", cursor.getInt(workspaceIndex));
+                } else {
+                    tarefa.putString("id_workspace", "NULL");
+                }
+                
+                // Status e prioridade
+                int statusIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_STATUS);
+                if (statusIndex >= 0 && !cursor.isNull(statusIndex)) {
+                    tarefa.putString("status", cursor.getString(statusIndex));
+                } else {
+                    tarefa.putString("status", "NULL");
+                }
+                
+                int prioridadeIndex = cursor.getColumnIndex(DatabaseContract.TarefaEntry.COLUMN_PRIORIDADE);
+                if (prioridadeIndex >= 0 && !cursor.isNull(prioridadeIndex)) {
+                    tarefa.putString("prioridade", cursor.getString(prioridadeIndex));
+                } else {
+                    tarefa.putString("prioridade", "NULL");
+                }
+                
+                tarefas.pushMap(tarefa);
+                
+                Log.i(TAG, "📋 [" + count + "] Tarefa: ID=" + idTarefa + ", Título=" + titulo + 
+                          ", Workspace=" + (workspaceIndex >= 0 && !cursor.isNull(workspaceIndex) ? 
+                          cursor.getInt(workspaceIndex) : "NULL"));
+            }
+            
+            Log.i(TAG, "✅ Total de tarefas no SQLite: " + count);
+            
+            result.putBoolean("success", true);
+            result.putArray("data", tarefas);
+            result.putInt("total", count);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao listar todas as tarefas: " + e.getMessage());
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return result;
+    }
+    
+    private WritableMap getCategoriasByWorkspace(SQLiteDatabase db, int workspaceId) {
+        WritableMap result = new WritableNativeMap();
+        Cursor cursor = null;
+        
+        try {
+            String query = "SELECT * FROM " + DatabaseContract.CategoriaEntry.TABLE_NAME + " WHERE " + 
+                          DatabaseContract.CategoriaEntry.COLUMN_ID_WORKSPACE + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{String.valueOf(workspaceId)});
+            
+            WritableArray categorias = new WritableNativeArray();
+            while (cursor.moveToNext()) {
+                WritableMap categoria = new WritableNativeMap();
+                categoria.putInt("id_categoria", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.CategoriaEntry.COLUMN_ID_CATEGORIA)));
+                categoria.putString("nome", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.CategoriaEntry.COLUMN_NOME)));
+                categoria.putInt("id_workspace", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.CategoriaEntry.COLUMN_ID_WORKSPACE)));
+                categorias.pushMap(categoria);
+            }
+            
+            result.putBoolean("success", true);
+            result.putArray("data", categorias);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao buscar categorias: " + e.getMessage());
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return result;
+    }
+    
+    private WritableMap getComentariosByTarefa(SQLiteDatabase db, int tarefaId) {
+        WritableMap result = new WritableNativeMap();
+        Cursor cursor = null;
+        
+        try {
+            String query = "SELECT * FROM " + DatabaseContract.ComentarioEntry.TABLE_NAME + " WHERE " + 
+                          DatabaseContract.ComentarioEntry.COLUMN_ID_TAREFA + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{String.valueOf(tarefaId)});
+            
+            WritableArray comentarios = new WritableNativeArray();
+            while (cursor.moveToNext()) {
+                WritableMap comentario = new WritableNativeMap();
+                comentario.putInt("id_comentario", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.ComentarioEntry.COLUMN_ID_COMENTARIO)));
+                comentario.putString("email", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.ComentarioEntry.COLUMN_EMAIL)));
+                comentario.putInt("id_tarefa", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.ComentarioEntry.COLUMN_ID_TAREFA)));
+                comentario.putString("descricao", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.ComentarioEntry.COLUMN_DESCRICAO)));
+                comentarios.pushMap(comentario);
+            }
+            
+            result.putBoolean("success", true);
+            result.putArray("data", comentarios);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao buscar comentários: " + e.getMessage());
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return result;
+    }
+    
+    private WritableMap getAnexosByTarefa(SQLiteDatabase db, int tarefaId) {
+        WritableMap result = new WritableNativeMap();
+        Cursor cursor = null;
+        
+        try {
+            String query = "SELECT * FROM " + DatabaseContract.AnexoEntry.TABLE_NAME + " WHERE " + 
+                          DatabaseContract.AnexoEntry.COLUMN_ID_TAREFA + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{String.valueOf(tarefaId)});
+            
+            WritableArray anexos = new WritableNativeArray();
+            while (cursor.moveToNext()) {
+                WritableMap anexo = new WritableNativeMap();
+                anexo.putInt("id_anexo", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.AnexoEntry.COLUMN_ID_ANEXO)));
+                anexo.putInt("id_tarefa", cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseContract.AnexoEntry.COLUMN_ID_TAREFA)));
+                anexo.putString("nome_arquivo", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.AnexoEntry.COLUMN_NOME_ARQUIVO)));
+                anexo.putString("caminho_arquivo", cursor.getString(cursor.getColumnIndexOrThrow(DatabaseContract.AnexoEntry.COLUMN_CAMINHO_ARQUIVO)));
+                anexos.pushMap(anexo);
+            }
+            
+            result.putBoolean("success", true);
+            result.putArray("data", anexos);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao buscar anexos: " + e.getMessage());
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        
+        return result;
+    }
 
     private WritableMap saveTarefaOperation(SQLiteDatabase db, JSONObject data) throws JSONException {
-        return saveTarefa(db, data);
+        WritableMap result = new WritableNativeMap();
+        try {
+            saveTarefa(db, data);
+            result.putBoolean("success", true);
+            result.putString("message", "Tarefa salva com sucesso");
+        } catch (Exception e) {
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        }
+        return result;
+    }
+
+    private WritableMap updateTarefaOperation(SQLiteDatabase db, JSONObject data) throws JSONException {
+        WritableMap result = new WritableNativeMap();
+        try {
+            updateTarefa(db, data);
+            result.putBoolean("success", true);
+            result.putString("message", "Tarefa atualizada com sucesso");
+        } catch (Exception e) {
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        }
+        return result;
     }
 
     private WritableMap saveComentarioOperation(SQLiteDatabase db, JSONObject data) throws JSONException {
-        return saveComentario(db, data);
+        WritableMap result = new WritableNativeMap();
+        try {
+            saveComentario(db, data);
+            result.putBoolean("success", true);
+            result.putString("message", "Comentário salvo com sucesso");
+        } catch (Exception e) {
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        }
+        return result;
+    }
+
+    private WritableMap saveUsuarioOperation(SQLiteDatabase db, JSONObject data) throws JSONException {
+        WritableMap result = new WritableNativeMap();
+        try {
+            // Criar um usuário básico com os dados fornecidos
+            ContentValues values = new ContentValues();
+            
+            if (data.has("email")) {
+                values.put("email", data.getString("email"));
+            }
+            if (data.has("nome")) {
+                values.put("nome", data.getString("nome"));
+            } else if (data.has("email")) {
+                // Extrair nome do email como fallback
+                String email = data.getString("email");
+                String nome = email.split("@")[0];
+                values.put("nome", nome);
+            }
+            if (data.has("telefone")) {
+                values.put("telefone", data.getString("telefone"));
+            }
+
+            // Por enquanto, apenas aceitar a operação sem salvar em tabela específica
+            // pois o usuário pode já estar associado via usuario_workspace
+            result.putBoolean("success", true);
+            result.putString("message", "Usuário processado com sucesso");
+        } catch (Exception e) {
+            result.putBoolean("success", false);
+            result.putString("error", e.getMessage());
+        }
+        return result;
     }
 
     private WritableMap getAllUserData(SQLiteDatabase db, String email) {

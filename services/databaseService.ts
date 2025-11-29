@@ -349,7 +349,31 @@ class DatabaseService {
    * Busca tarefa por ID (REAL)
    */
   async getTarefaById(id: number): Promise<DatabaseResult> {
-    return await this.executeOperation('get_tarefa_by_id', { id });
+    console.log(`🔍 DatabaseService: Buscando tarefa por ID ${id}`);
+    const result = await this.executeOperation('get_tarefa_by_id', { id });
+    console.log(`🔍 DatabaseService: Resultado da busca por ID ${id}:`, JSON.stringify(result, null, 2));
+    return result;
+  }
+
+  /**
+   * Lista todas as tarefas do SQLite para debug (REAL)
+   */
+  async listarTodasTarefasSQLite(): Promise<DatabaseResult> {
+    try {
+      console.log('🗃️ Listando TODAS as tarefas do SQLite para debug...');
+      
+      const result = await SyncService.executeDbOperation('list_all_tarefas', '{}');
+      
+      console.log('📋 TODAS as tarefas no SQLite:', JSON.stringify(result, null, 2));
+      
+      return result;
+    } catch (error: any) {
+      console.error('❌ Erro ao listar todas as tarefas:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   /**
@@ -357,6 +381,13 @@ class DatabaseService {
    */
   async saveTarefa(tarefa: Tarefa): Promise<DatabaseResult> {
     return await this.executeOperation('save_tarefa', tarefa);
+  }
+
+  /**
+   * Atualiza tarefa por ID (REAL) 
+   */
+  async updateTarefa(id: number, dadosAtualizacao: Partial<Tarefa>): Promise<DatabaseResult> {
+    return await this.executeOperation('update_tarefa', { id, ...dadosAtualizacao });
   }
 
   /**
@@ -487,6 +518,15 @@ class DatabaseService {
       };
     }
   }
+
+  /**
+   * Método público para executar operações diretas no banco
+   */
+  async executeDbOperation(operation: string, dataJson?: string): Promise<DatabaseResult> {
+    return this.executeOperation(operation, dataJson ? JSON.parse(dataJson) : undefined);
+  }
+
+
 }
 
 // Exporta uma instância única (Singleton)

@@ -22,6 +22,8 @@ import {
 import { deletarTarefa } from '../tarefa/dellTarefa';
 import { useTheme } from '../theme/ThemeContext';
 import ModalDenuncia from '../denuncia/ModalDenuncia';
+import { databaseService } from '../../services/databaseService';
+import { networkMonitor } from '../../services/networkinManager';
 
 type CardTarefasNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -110,6 +112,72 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     }
   }, [workspaceId]);
 
+  const carregarWorkspaceInfo = async (id: number) => {
+    try {
+      const isOnline = await networkMonitor.checkNetworkStatus();
+      
+      if (isOnline) {
+        // Modo online - buscar da API
+        try {
+          console.log('🏢 Carregando info do workspace online...');
+          const workspaceData = await apiCall(`/workspaces/id/${id}`, 'GET');
+          setWorkspaceInfo(workspaceData);
+          
+          // Validar se o workspace carregado é realmente o esperado
+          if (workspaceData.id_workspace !== id) {
+            console.error('⚠️ ERRO: ID do workspace não confere!', {
+              esperado: id,
+              recebido: workspaceData.id_workspace,
+              workspace: workspaceData
+            });
+          }
+        } catch (error) {
+          // Silenciosamente tentar fallback offline sem mostrar erro
+          await carregarWorkspaceInfoOffline(id);
+        }
+      } else {
+        // Modo offline - buscar do SQLite
+        console.log('🏢 Carregando info do workspace offline...');
+        await carregarWorkspaceInfoOffline(id);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar informações do workspace:', error);
+      setWorkspaceInfo(null);
+    }
+  };
+
+  const carregarWorkspaceInfoOffline = async (id: number) => {
+    try {
+      const email = await getUserEmail();
+      if (!email) return;
+
+      console.log('🔍 Debug: Buscando workspaces para email:', email);
+      const result = await databaseService.getWorkspacesByUser(email);
+      console.log('🔍 Debug: Resultado do SQLite:', JSON.stringify(result, null, 2));
+      
+      if (result.success && Array.isArray(result.data)) {
+        console.log('🔍 Debug: Workspaces encontrados:', result.data.length);
+        console.log('🔍 Debug: IDs dos workspaces:', result.data.map((ws: any) => ws.id_workspace));
+        console.log('🔍 Debug: Buscando ID:', id);
+        
+        const workspace = result.data.find((ws: any) => ws.id_workspace === id);
+        if (workspace) {
+          setWorkspaceInfo(workspace);
+          console.log('🏢 Workspace carregado do cache offline:', workspace.nome);
+        } else {
+          console.log('🏢 Workspace não encontrado no cache offline - ID não confere');
+          setWorkspaceInfo(null);
+        }
+      } else {
+        console.log('🏢 Nenhum workspace offline encontrado ou erro no resultado');
+        setWorkspaceInfo(null);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar workspace offline:', error);
+      setWorkspaceInfo(null);
+    }
+  };
+
   const initializeWorkspace = async () => {
     try {
       const id = await getActiveWorkspaceId();
@@ -123,28 +191,9 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       setUserEmail(email || '');
       setCurrentUserId(userId);
 
-      // Buscar informações do workspace por id
+      // Buscar informações do workspace por id (com suporte offline)
       if (id) {
-        try {
-          // Usar a rota correta: /workspaces/id/:id_workspace
-          const workspaceData = await apiCall(`/workspaces/id/${id}`, 'GET');
-
-          setWorkspaceInfo(workspaceData);
-          
-          // Validar se o workspace carregado é realmente o esperado
-          if (workspaceData.id_workspace !== id) {
-            console.error('⚠️ ERRO: ID do workspace não confere!', {
-              esperado: id,
-              recebido: workspaceData.id_workspace,
-              workspace: workspaceData
-            });
-          }
-        } catch (err) {
-          console.error('Erro ao buscar informações do workspace:', err);
-          setWorkspaceInfo(null);
-        }
-        // ❌ REMOVIDO: carregarTarefas() já é chamado pelo useEffect do workspaceId
-        // await carregarTarefas();
+        await carregarWorkspaceInfo(id);
       }
     } catch (error) {
       console.error('Erro ao obter workspace ativo:', error);
@@ -223,7 +272,9 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     // 2. Verificar pelo email do criador da tarefa se disponível
     if ((tarefa as any).criador_email && userEmail) {
       const isCreatorByEmail = (tarefa as any).criador_email === userEmail;
-      if (isCreatorByEmail) return true;
+      if (isCreatorByEmail) {
+        return true;
+      }
     }
     
     // 3. Verificar pelo nível de acesso (0 = criador)
@@ -294,58 +345,121 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     }
     setLoading(true);
     try {
-      // ✅ NOVA IMPLEMENTAÇÃO: Usar filtros do backend
+      const networkStatus = networkMonitor.getCurrentStatus();
       const filtrosAtivos = filtrosCustom || filtros;
-      const temFiltros = Object.keys(filtrosAtivos).length > 0;
-      
-      let endpoint: string;
       let dadosTarefas: Tarefa[];
       
-      if (temFiltros) {
-        // ✨ Usar nova rota de filtros avançados do backend
-        const params = new URLSearchParams();
+      if (networkStatus.isOnline) {
+        // 🌐 ONLINE: Buscar do backend
+        console.log('🌐 Modo ONLINE - Buscando tarefas do backend...');
         
-        // Mapear filtros para parâmetros da API
-        if (filtrosAtivos.palavras_chave?.trim()) {
-          params.append('palavras_chave', filtrosAtivos.palavras_chave.trim());
-        }
-        if (filtrosAtivos.status) {
-          params.append('status', filtrosAtivos.status);
-        }
-        if (filtrosAtivos.prioridade) {
-          params.append('prioridade', filtrosAtivos.prioridade);
-        }
-        if (filtrosAtivos.categoria_nome?.trim()) {
-          params.append('categoria_nome', filtrosAtivos.categoria_nome.trim());
-        }
-        if (filtrosAtivos.minhas_tarefas) {
-          params.append('minhas_tarefas', 'true');
-        }
-        if (filtrosAtivos.recorrentes) {
-          params.append('recorrentes', 'true');
-        }
-        if (filtrosAtivos.tipo_recorrencia) {
-          params.append('tipo_recorrencia', filtrosAtivos.tipo_recorrencia);
-        }
-        if (filtrosAtivos.tarefas_com_prazo) {
-          params.append('tarefas_com_prazo', 'true');
-        }
+        const temFiltros = Object.keys(filtrosAtivos).length > 0;
+        let endpoint: string;
         
-        endpoint = `/tarefas/workspace/${workspaceId}/filtros-avancados?${params.toString()}`;
-        console.log('� Usando filtros do backend:', endpoint);
+        if (temFiltros) {
+          // ✨ Usar nova rota de filtros avançados do backend
+          const params = new URLSearchParams();
+          
+          // Mapear filtros para parâmetros da API
+          if (filtrosAtivos.palavras_chave?.trim()) {
+            params.append('palavras_chave', filtrosAtivos.palavras_chave.trim());
+          }
+          if (filtrosAtivos.status) {
+            params.append('status', filtrosAtivos.status);
+          }
+          if (filtrosAtivos.prioridade) {
+            params.append('prioridade', filtrosAtivos.prioridade);
+          }
+          if (filtrosAtivos.categoria_nome?.trim()) {
+            params.append('categoria_nome', filtrosAtivos.categoria_nome.trim());
+          }
+          if (filtrosAtivos.minhas_tarefas) {
+            params.append('minhas_tarefas', 'true');
+          }
+          if (filtrosAtivos.recorrentes) {
+            params.append('recorrentes', 'true');
+          }
+          if (filtrosAtivos.tipo_recorrencia) {
+            params.append('tipo_recorrencia', filtrosAtivos.tipo_recorrencia);
+          }
+          if (filtrosAtivos.tarefas_com_prazo) {
+            params.append('tarefas_com_prazo', 'true');
+          }
+          
+          endpoint = `/tarefas/workspace/${workspaceId}/filtros-avancados?${params.toString()}`;
+          console.log('🔍 Usando filtros do backend:', endpoint);
+        } else {
+          // Sem filtros: usar endpoint simples
+          endpoint = `/tarefas/workspace/${workspaceId}`;
+          console.log('📡 Carregando todas as tarefas:', endpoint);
+        }
         
         dadosTarefas = await apiCall(endpoint, 'GET');
       } else {
-        // Sem filtros: usar endpoint simples
-        endpoint = `/tarefas/workspace/${workspaceId}`;
-        console.log('📡 Carregando todas as tarefas:', endpoint);
+        // 📴 OFFLINE: Buscar do SQLite
+        console.log('📴 Modo OFFLINE - Buscando tarefas do SQLite...');
         
-        dadosTarefas = await apiCall(endpoint, 'GET');
+        const result = await databaseService.getTarefasByWorkspace(workspaceId);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Falha ao buscar tarefas offline');
+        }
+        
+        dadosTarefas = result.data || [];
+        
+        // ✅ Aplicar filtros localmente quando offline
+        if (Object.keys(filtrosAtivos).length > 0) {
+          dadosTarefas = dadosTarefas.filter(tarefa => {
+            // Filtro por palavra-chave
+            if (filtrosAtivos.palavras_chave?.trim()) {
+              const palavraChaveLocal = filtrosAtivos.palavras_chave.trim().toLowerCase();
+              const contemPalavra = tarefa.titulo.toLowerCase().includes(palavraChaveLocal) || 
+                                   (tarefa.descricao && tarefa.descricao.toLowerCase().includes(palavraChaveLocal));
+              if (!contemPalavra) {
+                return false;
+              }
+            }
+            
+            // Filtro por status
+            if (filtrosAtivos.status && tarefa.status !== filtrosAtivos.status) {
+              return false;
+            }
+            
+            // Filtro por prioridade
+            if (filtrosAtivos.prioridade && tarefa.prioridade !== filtrosAtivos.prioridade) {
+              return false;
+            }
+            
+            // Filtro minhas tarefas
+            if (filtrosAtivos.minhas_tarefas && tarefa.id_usuario !== currentUserId) {
+              return false;
+            }
+            
+            // Filtro recorrentes
+            if (filtrosAtivos.recorrentes && !tarefa.recorrente) {
+              return false;
+            }
+            
+            // Filtro tipo recorrência
+            if (filtrosAtivos.tipo_recorrencia && tarefa.recorrencia !== filtrosAtivos.tipo_recorrencia) {
+              return false;
+            }
+            
+            // Filtro tarefas com prazo
+            if (filtrosAtivos.tarefas_com_prazo && !tarefa.data_fim) {
+              return false;
+            }
+            
+            return true;
+          });
+        }
+        
+        console.log(`💾 Tarefas carregadas do SQLite: ${dadosTarefas.length} tarefas`);
       }
       
       // Tarefas carregadas com sucesso
-      
-      console.log('📄 Tarefas carregadas:', dadosTarefas.length, 'tarefas do workspace', workspaceId);
+      const modoConexao = networkStatus.isOnline ? 'ONLINE' : 'OFFLINE';
+      console.log(`📄 Tarefas carregadas (${modoConexao}):`, dadosTarefas.length, 'tarefas do workspace', workspaceId);
       
       // VALIDAÇÃO CRÍTICA: Verificar se todas as tarefas pertencem ao workspace correto
       const tarefasInvalidas = dadosTarefas.filter(tarefa => tarefa.id_workspace !== workspaceId);
@@ -413,7 +527,25 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       setTarefas(tarefasOrdenadas);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as tarefas');
+      
+      const networkStatus = networkMonitor.getCurrentStatus();
+      
+      if (!networkStatus.isOnline) {
+        // Erro offline - provavelmente não tem dados locais
+        Alert.alert(
+          'Sem conexão', 
+          'Você está offline e não há dados salvos localmente. Conecte-se à internet para sincronizar os dados.',
+          [
+            { text: 'OK', style: 'default' },
+            { text: 'Tentar novamente', onPress: () => carregarTarefas(filtrosCustom) }
+          ]
+        );
+      } else {
+        // Erro online - problema de rede ou servidor
+        Alert.alert('Erro', 'Não foi possível carregar as tarefas. Verifique sua conexão.');
+      }
+      
+      setTarefas([]); // Limpar tarefas em caso de erro
     } finally {
       setLoading(false);
     }
@@ -487,24 +619,67 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
       const novoStatus = tarefa.status === 'concluido' ? 'a_fazer' : 'concluido';
       const novaConcluida = novoStatus === 'concluido';
       
-      // Se está concluindo uma tarefa (não desconcluindo)
-      const estaConcluindo = novoStatus === 'concluido' && tarefa.status !== 'concluido';
-      
-      // ✅ Usar o endpoint existente do backend: PUT /tarefas/:id_tarefa
-      await apiCall(`/tarefas/${tarefa.id_tarefa}`, 'PUT', {
-        status: novoStatus,
-        concluida: novaConcluida
+      console.log('🔄 [CardTarefas] Alterando status da tarefa:', {
+        id: tarefa.id_tarefa,
+        titulo: tarefa.titulo,
+        status_atual: tarefa.status,
+        novo_status: novoStatus
       });
       
-      // O backend já gerencia a adição de pontos automaticamente:
-      // - 0.5 pontos: Por completar qualquer tarefa
-      // - 1.0 ponto total: Por completar tarefa dentro do prazo (0.5 base + 0.5 bônus)
+      const networkStatus = networkMonitor.getCurrentStatus();
+      
+      if (networkStatus.isOnline) {
+        try {
+          // Modo online - tentar API
+          await apiCall(`/tarefas/${tarefa.id_tarefa}`, 'PUT', {
+            status: novoStatus,
+            concluida: novaConcluida
+          });
+          
+          console.log('✅ [CardTarefas] Status alterado online com sucesso');
+        } catch (apiError) {
+          console.log('📴 [CardTarefas] Falha na API, salvando offline...', apiError);
+          // Se API falhar, salvar offline
+          await salvarAlteracaoOffline(tarefa.id_tarefa, { status: novoStatus, concluida: novaConcluida });
+        }
+      } else {
+        // Modo offline - salvar localmente
+        console.log('📴 [CardTarefas] Modo offline - salvando localmente');
+        await salvarAlteracaoOffline(tarefa.id_tarefa, { status: novoStatus, concluida: novaConcluida });
+      }
       
       // Recarregar as tarefas para refletir a mudança
       await carregarTarefas();
     } catch (error) {
-      console.error('Erro ao alterar status da tarefa:', error);
+      console.error('❌ [CardTarefas] Erro ao alterar status da tarefa:', error);
       Alert.alert('Erro', 'Não foi possível alterar o status da tarefa');
+    }
+  };
+
+  const salvarAlteracaoOffline = async (idTarefa: number, dadosAtualizacao: any) => {
+    try {
+      // Atualizar no SQLite local
+      const resultUpdate = await databaseService.updateTarefa(idTarefa, dadosAtualizacao);
+      
+      if (resultUpdate.success) {
+        console.log('✅ [CardTarefas] Status atualizado no SQLite local');
+        
+        Alert.alert(
+          '📴 Salvo Offline',
+          'A alteração foi salva localmente e será sincronizada quando você estiver online.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.warn('⚠️ [CardTarefas] Falha ao atualizar no SQLite local:', resultUpdate.error);
+        throw new Error(resultUpdate.error);
+      }
+      
+      // TODO: Adicionar à fila de sincronização quando implementarmos
+      console.log('📋 [CardTarefas] Alteração marcada para sincronização futura');
+      
+    } catch (error: any) {
+      console.error('❌ [CardTarefas] Erro ao salvar offline:', error);
+      throw error;
     }
   };
 
