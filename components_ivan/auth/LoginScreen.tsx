@@ -9,6 +9,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  PermissionsAndroid,
+  Linking,
 } from 'react-native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../router';
@@ -35,6 +37,151 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<{email?: string; senha?: string}>({});
+
+  // Função para verificar permissão de microfone
+  const checkMicrophonePermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true; // iOS gerencia diferente
+    }
+
+    try {
+      const granted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+      );
+      return granted;
+    } catch (error) {
+      console.error('Erro ao verificar permissão de microfone:', error);
+      return false;
+    }
+  };
+
+  // Função para solicitar permissão de microfone
+  const requestMicrophonePermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: '🎤 Permissão de Microfone',
+          message: 'Para usar as funcionalidades de voz (criar tarefas e filtrar por voz), o app precisa acessar o microfone.',
+          buttonPositive: 'Permitir',
+          buttonNegative: 'Negar',
+        }
+      );
+
+      const isGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
+      console.log('Permissão de microfone:', isGranted ? 'CONCEDIDA' : 'NEGADA');
+      return isGranted;
+    } catch (error) {
+      console.error('Erro ao solicitar permissão de microfone:', error);
+      return false;
+    }
+  };
+
+  // Função para verificar permissões de arquivos
+  const checkFilePermissions = async (): Promise<boolean> => {
+    try {
+      const hasPermissions = await AnexoService.checkPermissions();
+      return hasPermissions;
+    } catch (error) {
+      console.error('Erro ao verificar permissões de arquivos:', error);
+      return false;
+    }
+  };
+
+  // Função para solicitar permissões de arquivos com redirecionamento
+  const requestFilePermissions = async (): Promise<void> => {
+    try {
+      const granted = await AnexoService.requestPermissionsWithUserFeedback();
+      if (!granted) {
+        // Se negada, oferecer opção de ir para configurações
+        Alert.alert(
+          '📁 Permissão de Arquivos',
+          'Para anexar documentos às tarefas, precisamos de acesso aos arquivos. Deseja abrir as configurações para habilitar?',
+          [
+            {
+              text: 'Agora não',
+              style: 'cancel',
+            },
+            {
+              text: 'Abrir Configurações',
+              onPress: () => {
+                Linking.openSettings();
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao solicitar permissões de arquivos:', error);
+    }
+  };
+
+  // Função para verificar permissões de calendário
+  const checkCalendarPermissions = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true; // iOS gerencia diferente
+    }
+
+    try {
+      const readGranted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.READ_CALENDAR
+      );
+      const writeGranted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR
+      );
+      return readGranted && writeGranted;
+    } catch (error) {
+      console.error('Erro ao verificar permissões de calendário:', error);
+      return false;
+    }
+  };
+
+  // Função para solicitar permissões de calendário
+  const requestCalendarPermissions = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+
+    try {
+      const readPermission = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_CALENDAR,
+        {
+          title: '📅 Permissão de Calendário (Leitura)',
+          message: 'Para sincronizar suas tarefas com eventos do calendário, precisamos acessar seu calendário.',
+          buttonPositive: 'Permitir',
+          buttonNegative: 'Negar',
+        }
+      );
+
+      const writePermission = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR,
+        {
+          title: '📅 Permissão de Calendário (Escrita)',
+          message: 'Para criar lembretes no calendário para suas tarefas, precisamos criar eventos.',
+          buttonPositive: 'Permitir',
+          buttonNegative: 'Negar',
+        }
+      );
+
+      const readGranted = readPermission === PermissionsAndroid.RESULTS.GRANTED;
+      const writeGranted = writePermission === PermissionsAndroid.RESULTS.GRANTED;
+      const bothGranted = readGranted && writeGranted;
+      
+      console.log('Permissões de calendário:', {
+        leitura: readGranted ? 'CONCEDIDA' : 'NEGADA',
+        escrita: writeGranted ? 'CONCEDIDA' : 'NEGADA'
+      });
+      
+      return bothGranted;
+    } catch (error) {
+      console.error('Erro ao solicitar permissões de calendário:', error);
+      return false;
+    }
+  };
   const [showFirstTimePopup, setShowFirstTimePopup] = useState<boolean>(false);
 
   const validarFormulario = (): boolean => {
@@ -125,12 +272,114 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               await GoogleCalendarService.initializeAfterLogin();
             }
 
-            const hasFilePermissions = await AnexoService.checkPermissions();
+            // Verificar e solicitar permissão de microfone
+            const hasMicPermission = await checkMicrophonePermission();
+            if (!hasMicPermission) {
+              setTimeout(async () => {
+                Alert.alert(
+                  '🎤 Permissão de Microfone',
+                  'Para usar as funcionalidades de voz (criar tarefas e filtrar por voz), precisamos de acesso ao microfone.\n\nDeseja ativar esta funcionalidade?',
+                  [
+                    {
+                      text: 'Agora não',
+                      style: 'cancel',
+                      onPress: () => console.log('ℹ️ Usuário optou por não ativar microfone')
+                    },
+                    {
+                      text: 'Ativar',
+                      onPress: async () => {
+                        const granted = await requestMicrophonePermission();
+                        if (granted) {
+                          Alert.alert(
+                            '✅ Microfone Ativado',
+                            'Agora você pode usar as funcionalidades de voz para criar e filtrar tarefas!',
+                            [{ text: 'Perfeito!', style: 'default' }]
+                          );
+                        } else {
+                          Alert.alert(
+                            'ℹ️ Permissão Necessária',
+                            'Sem acesso ao microfone, não será possível usar as funcionalidades de voz. Deseja abrir as configurações para habilitar?',
+                            [
+                              { text: 'Agora não', style: 'cancel' },
+                              {
+                                text: 'Abrir Configurações',
+                                onPress: () => Linking.openSettings()
+                              }
+                            ]
+                          );
+                        }
+                      }
+                    }
+                  ]
+                );
+              }, 1500);
+            }
 
+            // Verificar e solicitar permissões de calendário
+            const hasCalendarPermissions = await checkCalendarPermissions();
+            if (!hasCalendarPermissions) {
+              setTimeout(async () => {
+                Alert.alert(
+                  '📅 Permissões de Calendário',
+                  'Para sincronizar tarefas com seu calendário e criar lembretes automáticos, precisamos de acesso ao calendário.\n\nDeseja ativar esta funcionalidade?',
+                  [
+                    {
+                      text: 'Agora não',
+                      style: 'cancel',
+                      onPress: () => console.log('ℹ️ Usuário optou por não ativar calendário')
+                    },
+                    {
+                      text: 'Ativar',
+                      onPress: async () => {
+                        const granted = await requestCalendarPermissions();
+                        if (granted) {
+                          Alert.alert(
+                            '✅ Calendário Ativado',
+                            'Suas tarefas serão sincronizadas automaticamente com o calendário e você receberá lembretes!',
+                            [{ text: 'Perfeito!', style: 'default' }]
+                          );
+                        } else {
+                          Alert.alert(
+                            'ℹ️ Permissão Necessária',
+                            'Sem acesso ao calendário, não será possível sincronizar tarefas. Deseja abrir as configurações para habilitar?',
+                            [
+                              { text: 'Agora não', style: 'cancel' },
+                              {
+                                text: 'Abrir Configurações',
+                                onPress: () => Linking.openSettings()
+                              }
+                            ]
+                          );
+                        }
+                      }
+                    }
+                  ]
+                );
+              }, 2000);
+            }
+
+            // Verificar e solicitar permissões de arquivos
+            const hasFilePermissions = await checkFilePermissions();
             if (!hasFilePermissions) {
               setTimeout(async () => {
-                await AnexoService.requestPermissionsWithUserFeedback();
-              }, 1500);
+                Alert.alert(
+                  '📁 Permissão de Arquivos',
+                  'Para anexar documentos às suas tarefas, precisamos de acesso aos arquivos do dispositivo.\n\nDeseja ativar esta funcionalidade?',
+                  [
+                    {
+                      text: 'Agora não',
+                      style: 'cancel',
+                      onPress: () => console.log('ℹ️ Usuário optou por não ativar arquivos')
+                    },
+                    {
+                      text: 'Ativar',
+                      onPress: async () => {
+                        await requestFilePermissions();
+                      }
+                    }
+                  ]
+                );
+              }, 3000);
             }
 
             // Solicitar permissão de notificação
@@ -156,7 +405,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                   ]
                 );
               }
-            }, 2000); // Delay para não sobrecarregar o usuário com muitos dialogs
+            }, 4000); // Delay para não sobrecarregar o usuário com muitos dialogs
           } catch (error) {
             console.log('Usuário optou por não conceder algumas permissões');
           }

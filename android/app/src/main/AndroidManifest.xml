@@ -24,6 +24,10 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
+    <!-- NOVO: PERMISSÃO MANDATÓRIA PARA RECONHECIMENTO DE VOZ (MICROFONE) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -63,4 +67,11 @@
         android:exported="false" />
 
     </application>
+
+    <!-- NOVO: CONSULTAS PARA RECONHECIMENTO DE VOZ (Requisito Android 11+) -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 </manifest>

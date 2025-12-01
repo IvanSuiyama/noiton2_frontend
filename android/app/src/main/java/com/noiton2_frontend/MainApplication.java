@@ -20,6 +20,10 @@ import com.noiton2_frontend.FilePickerPackage;
 import com.noiton2_frontend.NotificationPackage;
 import com.noiton2_frontend.GoogleSignInPackage;
 
+// NOVO: IMPORTAR O PACOTE DO ASSISTENTE DE VOZ
+import com.noiton2_frontend.voice.VoiceAssistantPackage;
+
+
 // 2. IMPORTAR DATABASE HELPER E SYNC PACKAGE
 import com.noiton2_frontend.database.DatabaseHelper;
 import com.noiton2_frontend.SyncPackage;
@@ -46,6 +50,9 @@ public class MainApplication extends Application implements ReactApplication {
           
           // 4. ADICIONAR SYNC SERVICE
           packages.add(new SyncPackage());
+
+          // NOVO: ADICIONAR O PACOTE DO ASSISTENTE DE VOZ
+          packages.add(new VoiceAssistantPackage());
 
           return packages;
         }

@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, {useEffect} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
-import { ThemeProvider } from './theme/ThemeContext';
-import { IconProvider } from './icons/IconContext';
+import {ThemeProvider} from './theme/ThemeContext';
+import {IconProvider} from './icons/IconContext';
 import CalendarSyncService from '../services/calendarSyncService';
 
 import WelcomeScreen from './welcome/WelcomeScreen';
@@ -36,9 +36,9 @@ import CardFavoritos from './cards/cardFavoritos';
 import ConfiguracoesScreen from './configuracoes/ConfiguracoesScreen';
 import CalendarioScreen from './calendario/CalendarioScreen';
 import CardDashboard from './cards/CardDashboard';
+import CadVoiceTarefa from './tarefa/voiceCadTarefa';
 
 export type RootStackParamList = {
-
   Welcome: undefined;
   Login: undefined;
   // LoginOffline: undefined;
@@ -50,14 +50,16 @@ export type RootStackParamList = {
 
   Home: undefined;
 
-  CadastroUsuario: {
-    googleData?: {
-      nome: string;
-      email: string;
-      isFromGoogle: boolean;
-    };
-  } | undefined;
-  EditUsuario: { userEmail: string };
+  CadastroUsuario:
+    | {
+        googleData?: {
+          nome: string;
+          email: string;
+          isFromGoogle: boolean;
+        };
+      }
+    | undefined;
+  EditUsuario: {userEmail: string};
   SelectUsuario: {
     onSelectUser?: (user: any) => void;
     multiSelect?: boolean;
@@ -65,7 +67,7 @@ export type RootStackParamList = {
     excludeEmails?: string[];
     showActions?: boolean;
   };
-  DellUser: { userEmail?: string };
+  DellUser: {userEmail?: string};
 
   CadastroWorkspace: undefined;
   EditWorkspace: {
@@ -81,13 +83,14 @@ export type RootStackParamList = {
   };
 
   CadastroTarefa: undefined;
-  EditTarefa: { id_tarefa: number };
-  VisualizaTarefa: { id_tarefa?: number; titulo?: string };
+  EditTarefa: {id_tarefa: number};
+  VisualizaTarefa: {id_tarefa?: number; titulo?: string};
+  CadVoiceTarefa: undefined;
 
   CadastroCategoria: undefined;
 
-  CadComentario: { id_tarefa: number; titulo: string };
-  EditComentario: { comentario: any; id_tarefa: number; titulo_tarefa: string };
+  CadComentario: {id_tarefa: number; titulo: string};
+  EditComentario: {comentario: any; id_tarefa: number; titulo_tarefa: string};
 
   CardFavoritos: undefined;
   Configuracoes: undefined;
@@ -99,7 +102,6 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 const Router: React.FC = () => {
   useEffect(() => {
-
     CalendarSyncService.initializeAutoSync();
   }, []);
 
@@ -107,43 +109,52 @@ const Router: React.FC = () => {
     <ThemeProvider>
       <IconProvider>
         <NavigationContainer>
-        <Stack.Navigator
-        initialRouteName="Welcome"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#2a2a2a',
-          },
-          headerTintColor: '#ffffff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          cardStyle: {
-            backgroundColor: '#1a1a1a',
-          },
-        }}>
+          <Stack.Navigator
+            initialRouteName="Welcome"
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: '#2a2a2a',
+              },
+              headerTintColor: '#ffffff',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+              cardStyle: {
+                backgroundColor: '#1a1a1a',
+              },
+            }}>
+            {}
 
-        {}
+            {}
+            <Stack.Screen
+              name="Welcome"
+              component={WelcomeScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            {}
+            <Stack.Screen
+              name="CadVoiceTarefa"
+              component={CadVoiceTarefa}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal', // modal real
+                cardStyle: {backgroundColor: 'rgba(0,0,0,0.5)'},
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="Welcome"
-          component={WelcomeScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{
+                title: 'Login',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{
-            title: 'Login',
-            headerBackTitleVisible: false,
-          }}
-        />
-
-        {/* <Stack.Screen
+            {/* <Stack.Screen
           name="LoginOffline"
           component={LoginOfflineScreen}
           options={{
@@ -152,217 +163,216 @@ const Router: React.FC = () => {
           }}
         /> */}
 
-        <Stack.Screen
-          name="AdminLogin"
-          component={AdminLoginScreen}
-          options={{
-            title: 'Login Admin',
-            headerBackTitleVisible: false,
-          }}
-        />
+            <Stack.Screen
+              name="AdminLogin"
+              component={AdminLoginScreen}
+              options={{
+                title: 'Login Admin',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        <Stack.Screen
-          name="Admin"
-          component={AdminScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+            <Stack.Screen
+              name="Admin"
+              component={AdminScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
 
-        <Stack.Screen
-          name="Lojinha"
-          component={LojinhaScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+            <Stack.Screen
+              name="Lojinha"
+              component={LojinhaScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
 
-        <Stack.Screen
-          name="Ajuda"
-          component={AjudaScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+            <Stack.Screen
+              name="Ajuda"
+              component={AjudaScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="CadastroUsuario"
-          component={CadUsuario}
-          options={{
-            title: 'Cadastro de Usuário',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="CadastroUsuario"
+              component={CadUsuario}
+              options={{
+                title: 'Cadastro de Usuário',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="EditUsuario"
-          component={EditUsuario}
-          options={{
-            title: 'Editar Usuário',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="EditUsuario"
+              component={EditUsuario}
+              options={{
+                title: 'Editar Usuário',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="SelectUsuario"
-          component={SelectUsuario}
-          options={{
-            title: 'Selecionar Usuários',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="SelectUsuario"
+              component={SelectUsuario}
+              options={{
+                title: 'Selecionar Usuários',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="DellUser"
-          component={DellUser}
-          options={{
-            title: 'Excluir Usuário',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="DellUser"
+              component={DellUser}
+              options={{
+                title: 'Excluir Usuário',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
+            {}
 
-        {}
-        <Stack.Screen
-          name="CadastroWorkspace"
-          component={CadWorkspace}
-          options={{
-            title: 'Criar Workspace',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="CadastroWorkspace"
+              component={CadWorkspace}
+              options={{
+                title: 'Criar Workspace',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="EditWorkspace"
-          component={EditWorkspace}
-          options={{
-            title: 'Editar Workspace',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="EditWorkspace"
+              component={EditWorkspace}
+              options={{
+                title: 'Editar Workspace',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
+            {}
 
-        {}
-        <Stack.Screen
-          name="CadastroTarefa"
-          component={CadTarefa}
-          options={{
-            title: 'Nova Tarefa',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="CadastroTarefa"
+              component={CadTarefa}
+              options={{
+                title: 'Nova Tarefa',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="EditTarefa"
-          component={EditTarefa}
-          options={{
-            title: 'Editar Tarefa',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="EditTarefa"
+              component={EditTarefa}
+              options={{
+                title: 'Editar Tarefa',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="VisualizaTarefa"
-          component={VisualizaTarefa}
-          options={{
-            title: 'Detalhes da Tarefa',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="VisualizaTarefa"
+              component={VisualizaTarefa}
+              options={{
+                title: 'Detalhes da Tarefa',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
+            {}
 
-        {}
-        <Stack.Screen
-          name="CadastroCategoria"
-          component={CadCategoria}
-          options={{
-            title: 'Nova Categoria',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="CadastroCategoria"
+              component={CadCategoria}
+              options={{
+                title: 'Nova Categoria',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
+            {}
 
-        {}
-        <Stack.Screen
-          name="CadComentario"
-          component={CadComentario}
-          options={{
-            headerShown: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="CadComentario"
+              component={CadComentario}
+              options={{
+                headerShown: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="EditComentario"
-          component={EditComentarioScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="EditComentario"
+              component={EditComentarioScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
 
-        {}
+            {}
 
-        {}
-        <Stack.Screen
-          name="CardFavoritos"
-          component={CardFavoritos}
-          options={{
-            title: 'Favoritos',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="CardFavoritos"
+              component={CardFavoritos}
+              options={{
+                title: 'Favoritos',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="Configuracoes"
-          component={ConfiguracoesScreen}
-          options={{
-            title: 'Configurações',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="Configuracoes"
+              component={ConfiguracoesScreen}
+              options={{
+                title: 'Configurações',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="Calendario"
-          component={CalendarioScreen}
-          options={{
-            title: 'Calendário',
-            headerBackTitleVisible: false,
-          }}
-        />
+            {}
+            <Stack.Screen
+              name="Calendario"
+              component={CalendarioScreen}
+              options={{
+                title: 'Calendário',
+                headerBackTitleVisible: false,
+              }}
+            />
 
-        {}
-        <Stack.Screen
-          name="Dashboard"
-          component={CardDashboard}
-          options={{
-            title: 'Métricas',
-            headerBackTitleVisible: false,
-          }}
-        />
-
-        </Stack.Navigator>
+            {}
+            <Stack.Screen
+              name="Dashboard"
+              component={CardDashboard}
+              options={{
+                title: 'Métricas',
+                headerBackTitleVisible: false,
+              }}
+            />
+          </Stack.Navigator>
         </NavigationContainer>
       </IconProvider>
     </ThemeProvider>

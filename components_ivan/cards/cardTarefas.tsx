@@ -24,6 +24,8 @@ import { useTheme } from '../theme/ThemeContext';
 import ModalDenuncia from '../denuncia/ModalDenuncia';
 import { databaseService } from '../../services/databaseService';
 import { networkMonitor } from '../../services/networkinManager';
+import CadVoiceTarefa from '../tarefa/voiceCadTarefa';
+import VoiceFilterTarefa from '../tarefa/voiceFilterTarefa';
 
 type CardTarefasNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -92,6 +94,12 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
 
   const STORAGE_KEY = 'tarefas_favoritas';
 
+  // NOVO ESTADO PARA GERENCIAR A VISIBILIDADE DO MODAL DE VOZ
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  
+  // ESTADO PARA GERENCIAR O MODAL DE FILTRO POR VOZ
+  const [showVoiceFilterModal, setShowVoiceFilterModal] = useState(false);
+
 
   // Sempre que refreshKey mudar, ou workspaceId/workspaceInfo/userEmail, recarrega tudo
   useEffect(() => {
@@ -149,7 +157,9 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
   const carregarWorkspaceInfoOffline = async (id: number) => {
     try {
       const email = await getUserEmail();
-      if (!email) return;
+      if (!email) {
+        return;
+      }
 
       console.log('🔍 Debug: Buscando workspaces para email:', email);
       const result = await databaseService.getWorkspacesByUser(email);
@@ -610,6 +620,52 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
     navigation.navigate('VisualizaTarefa', { id_tarefa: tarefa.id_tarefa });
   };
 
+  // NOVA FUNÇÃO PARA ABRIR O MODAL DE VOZ
+  const abrirModalVoz = () => {
+    setShowVoiceModal(true);
+  };
+  
+  // FUNÇÃO PARA FECHAR O MODAL DE VOZ
+  const fecharModalVoz = () => {
+      setShowVoiceModal(false);
+  };
+
+  // FUNÇÕES PARA O MODAL DE FILTRO POR VOZ
+  const abrirModalFiltroVoz = () => {
+    setShowVoiceFilterModal(true);
+  };
+  
+  const fecharModalFiltroVoz = () => {
+    setShowVoiceFilterModal(false);
+  };
+
+  // FUNÇÃO PARA APLICAR FILTRO POR VOZ
+  const aplicarFiltroVoz = async (filtrosVoz: { palavras_chave?: string; termo_original?: string }) => {
+    console.log('🎙️ Aplicando filtro por voz:', filtrosVoz);
+    
+    // Incluir filtros existentes + filtro por voz
+    const filtrosCompletos = {
+      ...filtros,
+      palavras_chave: filtrosVoz.palavras_chave // Usa o termo normalizado (lowercase)
+    };
+    
+    // Atualizar estado dos filtros
+    setFiltros(filtrosCompletos);
+    
+    // Atualizar campo de palavra-chave no input com o termo original (com capitalização)
+    if (filtrosVoz.termo_original) {
+      setPalavraChave(filtrosVoz.termo_original);
+    } else if (filtrosVoz.palavras_chave) {
+      setPalavraChave(filtrosVoz.palavras_chave);
+    }
+    
+    // Aplicar filtros
+    await carregarTarefas(filtrosCompletos);
+    
+    // Fechar modal
+    setShowVoiceFilterModal(false);
+  };
+
 
 
 
@@ -831,6 +887,12 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
             <Text style={styles.filtroIconText}>⚙️</Text>
           </TouchableOpacity>
           
+          <TouchableOpacity
+            style={[styles.filtroIcon, { backgroundColor: theme.colors.background }]}
+            onPress={abrirModalFiltroVoz}>
+            <Text style={styles.filtroIconText}>🎙️</Text>
+          </TouchableOpacity>
+          
           <TextInput
             style={[styles.palavraChaveInput, { 
               backgroundColor: theme.colors.background,
@@ -853,13 +915,22 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         </View>
       </View>
 
-      {/* Botão Criar Tarefa */}
-      <View style={styles.criarTarefaContainer}>
+      {/* Botões Criar Tarefa */}
+      <View style={styles.botoesContainer}>
         <TouchableOpacity
-          style={styles.criarTarefaButton}
+          style={styles.criarTarefaButtonAzul}
           onPress={handleCriarTarefa}
         >
           <Text style={styles.criarTarefaButtonText}>➕ Criar Tarefa</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.criarTarefaButtonVerde}
+          onPress={() => {
+            abrirModalVoz();
+          }}
+        >
+          <Text style={styles.criarTarefaButtonText}>🎙️ Criar por Voz</Text>
         </TouchableOpacity>
       </View>
 
@@ -1105,6 +1176,25 @@ const CardTarefas: React.FC<CardTarefasProps> = ({ navigation, refreshKey }) => 
         </View>
       </Modal>
 
+      {/* Modal de Voz */}
+      {showVoiceModal && (
+        <Modal
+          visible={showVoiceModal}
+          transparent
+          animationType="slide"
+          onRequestClose={fecharModalVoz}
+        >
+          <CadVoiceTarefa onClose={fecharModalVoz} />
+        </Modal>
+      )}
+
+      {/* Modal de Filtro por Voz */}
+      <VoiceFilterTarefa
+        visible={showVoiceFilterModal}
+        onClose={fecharModalFiltroVoz}
+        onFilter={aplicarFiltroVoz}
+      />
+
     </View>
   );
 };
@@ -1158,6 +1248,17 @@ const styles = StyleSheet.create({
   
   lupaIconText: {
     fontSize: 16,
+  },
+  
+  botoesContainer: {
+    backgroundColor: '#2a2a2a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a3a',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   
   criarTarefaContainer: {
@@ -1287,6 +1388,36 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  
+  criarTarefaButtonAzul: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    flex: 1,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  
+  criarTarefaButtonVerde: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    flex: 1,
+    marginLeft: 8,
+    alignItems: 'center',
   },
   
   criarTarefaButtonText: {
