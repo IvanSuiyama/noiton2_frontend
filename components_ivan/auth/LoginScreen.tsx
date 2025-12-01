@@ -399,7 +399,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
                 console.log(`❓ Solicitando permissão: ${task.name}`);
                 await task.requestFn();
                 // Delay entre permissões para evitar sobreposição
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
               } else {
                 console.log(`✅ Permissão já concedida: ${task.name}`);
               }
