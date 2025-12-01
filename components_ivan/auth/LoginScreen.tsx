@@ -548,6 +548,7 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
 
       {}
       <FirstTimePopup
