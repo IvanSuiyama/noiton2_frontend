@@ -60,12 +60,6 @@
         </intent-filter>
       </receiver>
 
-      <!-- SERVIÇO PARA SINCRONIZAÇÃO EM SEGUNDO PLANO (OPCIONAL) -->
-      <service
-        android:name=".sync.SyncService"
-        android:enabled="true"
-        android:exported="false" />
-
     </application>
 
     <!-- NOVO: CONSULTAS PARA RECONHECIMENTO DE VOZ (Requisito Android 11+) -->

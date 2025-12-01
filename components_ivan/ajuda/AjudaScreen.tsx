@@ -30,44 +30,44 @@ const AjudaScreen: React.FC<Props> = ({ navigation }) => {
 
   const funcionalidades: FuncionalidadeApp[] = [
     {
-      icone: '📝',
-      titulo: 'Criar Tarefas',
-      descricao: 'Crie tarefas com título, descrição, categoria e prazo'
+      icone: '🎤',
+      titulo: 'Criar Tarefas por Voz',
+      descricao: 'Use o microfone para criar tarefas falando! Sistema guiado em 6 etapas: título, descrição, prazo, prioridade e recorrência.'
     },
     {
-      icone: '🏢',
-      titulo: 'Workspaces',
-      descricao: 'Organize suas tarefas em diferentes espaços de trabalho'
+      icone: '🔍',
+      titulo: 'Buscar por Voz',
+      descricao: 'Encontre suas tarefas rapidamente falando o nome ou palavra-chave. Toque no ícone de busca com microfone.'
     },
     {
-      icone: '👥',
-      titulo: 'Membros',
-      descricao: 'Adicione membros ao seu workspace e atribua tarefas'
-    },
-    {
-      icone: '📅',
-      titulo: 'Calendário',
-      descricao: 'Visualize suas tarefas organizadas por data'
-    },
-    {
-      icone: '⭐',
-      titulo: 'Favoritos',
-      descricao: 'Marque tarefas importantes como favoritas'
-    },
-    {
-      icone: '🔔',
-      titulo: 'Notificações',
-      descricao: 'Receba lembretes sobre prazos de tarefas'
-    },
-    {
-      icone: '🏪',
-      titulo: 'Lojinha',
-      descricao: 'Personalize seu perfil com avatares e temas'
+      icone: '📱',
+      titulo: 'Sistema Offline',
+      descricao: 'Trabalhe sem internet! Todas as tarefas, workspaces e categorias ficam salvas localmente e sincronizam automaticamente quando há conexão.'
     },
     {
       icone: '🌙',
-      titulo: 'Temas',
-      descricao: 'Alterne entre tema claro e escuro'
+      titulo: 'Troca de Temas',
+      descricao: 'Alterne entre tema claro e escuro nas configurações. Sua preferência fica salva mesmo offline.'
+    },
+    {
+      icone: '🏪',
+      titulo: 'Loja de Personalização',
+      descricao: 'Personalize seu perfil com avatares exclusivos e desbloqueie novos temas para deixar o app com sua cara!'
+    },
+    {
+      icone: '👮',
+      titulo: 'Painel Administrativo',
+      descricao: 'Administradores podem gerenciar denúncias, moderar conteúdo e visualizar estatísticas do sistema (acesso restrito).'
+    },
+    {
+      icone: '📋',
+      titulo: 'Tela de Ajuda',
+      descricao: 'Guia completo com todas as funcionalidades, dicas de uso e instruções passo a passo para aproveitar melhor o app.'
+    },
+    {
+      icone: '🚨',
+      titulo: 'Sistema de Denúncias',
+      descricao: 'Reporte conteúdo inadequado ou problemas. As denúncias são analisadas pela equipe de moderação.'
     },
   ];
 
@@ -156,6 +156,77 @@ const AjudaScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <Text style={[styles.actionArrow, { color: theme.colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Sistema de Voz */}
+        <View style={styles.secaoContainer}>
+          <Text style={[styles.secaoTitulo, { color: theme.colors.text }]}>
+            🎤 Como usar o Sistema de Voz
+          </Text>
+          
+          <View style={[styles.docContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.docTitulo, { color: theme.colors.text }]}>
+              🗣️ Criar Tarefa por Voz
+            </Text>
+            <Text style={[styles.docConteudo, { color: theme.colors.textSecondary }]}>
+              1. Na lista de tarefas, toque no ícone do microfone 🎤{'\n'}
+              2. Siga as 6 etapas guiadas:{'\n'}
+              • 📝 Título da tarefa{'\n'}
+              • 📄 Descrição dos detalhes{'\n'}
+              • 📅 Data do prazo (DD/MM/AAAA){'\n'}
+              • ⚡ Prioridade (alta, média, baixa){'\n'}
+              • 🔄 Se é recorrente (sim/não){'\n'}
+              • 📆 Tipo de recorrência (diária, semanal, mensal){'\n\n'}
+              💡 Dicas:{'\n'}
+              • Diga "não" ou "não tem" para pular campos opcionais{'\n'}
+              • Diga "cancelar" para parar a criação{'\n'}
+              • Fale claramente e aguarde o sinal sonoro
+            </Text>
+            
+            <Text style={[styles.docTitulo, { color: theme.colors.text, marginTop: 20 }]}>
+              🔍 Buscar por Voz
+            </Text>
+            <Text style={[styles.docConteudo, { color: theme.colors.textSecondary }]}>
+              1. Na lista de tarefas, toque no ícone de busca com microfone{'\n'}
+              2. Fale o nome ou palavra-chave da tarefa{'\n'}
+              3. O sistema filtrará automaticamente{'\n\n'}
+              Exemplos: "estudar matemática", "reunião cliente", "comprar ingredientes"
+            </Text>
+          </View>
+        </View>
+
+        {/* Modo Offline */}
+        <View style={styles.secaoContainer}>
+          <Text style={[styles.secaoTitulo, { color: theme.colors.text }]}>
+            📱 Funcionamento Offline
+          </Text>
+          
+          <View style={[styles.docContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.docTitulo, { color: theme.colors.text }]}>
+              💾 O que funciona sem internet
+            </Text>
+            <Text style={[styles.docConteudo, { color: theme.colors.textSecondary }]}>
+              ✅ Criar, editar e excluir tarefas{'\n'}
+              ✅ Visualizar workspaces e membros{'\n'}
+              ✅ Usar sistema de voz (criar e buscar){'\n'}
+              ✅ Filtrar e organizar tarefas{'\n'}
+              ✅ Marcar como favoritas{'\n'}
+              ✅ Adicionar comentários{'\n'}
+              ✅ Configurar temas e preferências{'\n\n'}
+              Todos os dados ficam salvos localmente no seu dispositivo!
+            </Text>
+            
+            <Text style={[styles.docTitulo, { color: theme.colors.text, marginTop: 20 }]}>
+              🔄 Sincronização Automática
+            </Text>
+            <Text style={[styles.docConteudo, { color: theme.colors.textSecondary }]}>
+              • WiFi detectado = Sincronização automática{'\n'}
+              • Dados móveis = Sincronização opcional{'\n'}
+              • Conflitos resolvidos automaticamente{'\n'}
+              • Sempre mantém a versão mais recente{'\n\n'}
+              📊 Status: Veja o indicador de conexão no topo da tela
+            </Text>
+          </View>
         </View>
 
         {/* Seção de Funcionalidades */}

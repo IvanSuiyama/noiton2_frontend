@@ -214,198 +214,212 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
 
         const workspaceSetup = await setupActiveWorkspace();
 
+        // ===================================
+        // 🔄 FILA DE PERMISSÕES SEQUENCIAL
+        // ===================================
+        interface PermissionTask {
+          id: string;
+          checkFn: () => Promise<boolean>;
+          requestFn: () => Promise<void>;
+          name: string;
+        }
+
+        const processPermissionQueue = async () => {
+          const permissionTasks: PermissionTask[] = [
+            {
+              id: 'google_calendar',
+              name: 'Google Calendar',
+              checkFn: async () => {
+                try {
+                  return await GoogleCalendarService.hasCalendarPermissions();
+                } catch (error) {
+                  console.log('⚠️ Erro ao verificar permissões Google Calendar:', error);
+                  return true; // Skip se houver erro
+                }
+              },
+              requestFn: async () => {
+                return new Promise<void>((resolve) => {
+                  Alert.alert(
+                    '📅 Integração com Google Calendar',
+                    'Para uma melhor experiência, o app pode sincronizar suas tarefas com o Google Calendar e enviar lembretes de prazos.\n\nDeseja ativar esta funcionalidade?',
+                    [
+                      {
+                        text: 'Agora não',
+                        style: 'cancel',
+                        onPress: async () => {
+                          console.log('ℹ️ Usuário optou por não usar integração com Google Calendar');
+                          resolve();
+                        }
+                      },
+                      {
+                        text: 'Ativar',
+                        onPress: async () => {
+                          try {
+                            const granted = await GoogleCalendarService.requestCalendarPermissions();
+                            if (granted) {
+                              console.log('✅ Permissões do Google Calendar concedidas');
+                              Alert.alert(
+                                '✅ Google Calendar',
+                                'Integração ativada com sucesso!\n\n• Tarefas serão sincronizadas automaticamente\n• Você receberá lembretes de prazos',
+                                [{ text: 'Perfeito!', onPress: () => resolve() }]
+                              );
+                            } else {
+                              Alert.alert(
+                                'ℹ️ Permissões',
+                                'Sem as permissões, não será possível sincronizar com o Google Calendar.',
+                                [{ text: 'OK', onPress: () => resolve() }]
+                              );
+                            }
+                          } catch (error) {
+                            console.log('⚠️ Erro ao configurar calendário:', error);
+                            resolve();
+                          }
+                        }
+                      }
+                    ]
+                  );
+                });
+              }
+            },
+            {
+              id: 'microphone',
+              name: 'Microfone',
+              checkFn: () => checkMicrophonePermission(),
+              requestFn: async () => {
+                return new Promise<void>((resolve) => {
+                  Alert.alert(
+                    '🎤 Permissão de Microfone',
+                    'Para usar as funcionalidades de voz (criar tarefas e filtrar por voz), precisamos de acesso ao microfone.\n\nDeseja ativar esta funcionalidade?',
+                    [
+                      {
+                        text: 'Agora não',
+                        style: 'cancel',
+                        onPress: () => {
+                          console.log('ℹ️ Usuário optou por não ativar microfone');
+                          resolve();
+                        }
+                      },
+                      {
+                        text: 'Ativar',
+                        onPress: async () => {
+                          const granted = await requestMicrophonePermission();
+                          if (granted) {
+                            Alert.alert(
+                              '✅ Microfone Ativado',
+                              'Agora você pode usar as funcionalidades de voz para criar e filtrar tarefas!',
+                              [{ text: 'Perfeito!', onPress: () => resolve() }]
+                            );
+                          } else {
+                            Alert.alert(
+                              'ℹ️ Permissão Necessária',
+                              'Sem acesso ao microfone, não será possível usar as funcionalidades de voz.',
+                              [{ text: 'OK', onPress: () => resolve() }]
+                            );
+                          }
+                        }
+                      }
+                    ]
+                  );
+                });
+              }
+            },
+            {
+              id: 'files',
+              name: 'Arquivos',
+              checkFn: () => checkFilePermissions(),
+              requestFn: async () => {
+                return new Promise<void>((resolve) => {
+                  Alert.alert(
+                    '📁 Permissão de Arquivos',
+                    'Para anexar documentos às suas tarefas, precisamos de acesso aos arquivos do dispositivo.\n\nDeseja ativar esta funcionalidade?',
+                    [
+                      {
+                        text: 'Agora não',
+                        style: 'cancel',
+                        onPress: () => {
+                          console.log('ℹ️ Usuário optou por não ativar arquivos');
+                          resolve();
+                        }
+                      },
+                      {
+                        text: 'Ativar',
+                        onPress: async () => {
+                          await requestFilePermissions();
+                          resolve();
+                        }
+                      }
+                    ]
+                  );
+                });
+              }
+            },
+            {
+              id: 'notifications',
+              name: 'Notificações',
+              checkFn: async () => {
+                await checkPermission();
+                return !!permissionStatus?.enabled;
+              },
+              requestFn: async () => {
+                return new Promise<void>((resolve) => {
+                  Alert.alert(
+                    '🔔 Permissão de Notificações',
+                    'Para receber lembretes sobre suas tarefas (prazos próximos, novas tarefas criadas), precisamos de permissão para enviar notificações.\n\nDeseja ativar as notificações?',
+                    [
+                      {
+                        text: 'Agora não',
+                        style: 'cancel',
+                        onPress: () => {
+                          console.log('ℹ️ Usuário optou por não ativar notificações');
+                          resolve();
+                        }
+                      },
+                      {
+                        text: 'Ativar',
+                        onPress: async () => {
+                          await requestPermission();
+                          console.log('🔔 Configurações de notificação abertas');
+                          resolve();
+                        }
+                      }
+                    ]
+                  );
+                });
+              }
+            }
+          ];
+
+          // Processar fila sequencialmente
+          for (const task of permissionTasks) {
+            try {
+              console.log(`🔍 Verificando permissão: ${task.name}`);
+              const hasPermission = await task.checkFn();
+              
+              if (!hasPermission) {
+                console.log(`❓ Solicitando permissão: ${task.name}`);
+                await task.requestFn();
+                // Delay entre permissões para evitar sobreposição
+                await new Promise(resolve => setTimeout(resolve, 500));
+              } else {
+                console.log(`✅ Permissão já concedida: ${task.name}`);
+              }
+            } catch (error) {
+              console.log(`⚠️ Erro ao processar permissão ${task.name}:`, error);
+            }
+          }
+
+          console.log('✅ Todas as permissões foram processadas!');
+        };
+
         const requestAllPermissions = async () => {
           try {
-
             console.log('📅 Configurando integração com Google Calendar...');
-            try {
-
-              const hasPermissions = await GoogleCalendarService.hasCalendarPermissions();
-
-              if (!hasPermissions) {
-
-                Alert.alert(
-                  '📅 Integração com Google Calendar',
-                  'Para uma melhor experiência, o app pode sincronizar suas tarefas com o Google Calendar e enviar lembretes de prazos.\n\nDeseja ativar esta funcionalidade?',
-                  [
-                    {
-                      text: 'Agora não',
-                      onPress: async () => {
-                        console.log('ℹ️ Usuário optou por não usar integração com Google Calendar');
-                        await GoogleCalendarService.initializeAfterLogin();
-                      },
-                      style: 'cancel',
-                    },
-                    {
-                      text: 'Ativar',
-                      onPress: async () => {
-                        const granted = await GoogleCalendarService.requestCalendarPermissions();
-                        if (granted) {
-                          console.log('✅ Permissões do Google Calendar concedidas - sincronização automática ativada');
-
-                          await GoogleCalendarService.initializeAfterLogin();
-
-                          Alert.alert(
-                            '✅ Google Calendar',
-                            'Integração ativada com sucesso!\n\n• Tarefas serão sincronizadas automaticamente\n• Você receberá lembretes de prazos\n• Verificação automática a cada 4 horas',
-                            [{ text: 'Perfeito!', style: 'default' }]
-                          );
-                        } else {
-                          Alert.alert(
-                            'ℹ️ Permissões',
-                            'Sem as permissões, não será possível sincronizar com o Google Calendar. Você pode ativar isso depois nas configurações.',
-                            [{ text: 'OK', style: 'default' }]
-                          );
-                          await GoogleCalendarService.initializeAfterLogin();
-                        }
-                      },
-                    },
-                  ]
-                );
-              } else {
-                console.log('✅ Permissões do Google Calendar já concedidas');
-                await GoogleCalendarService.initializeAfterLogin();
-              }
-            } catch (calendarError) {
-              console.log('⚠️ Erro ao configurar calendário:', calendarError);
-
-              await GoogleCalendarService.initializeAfterLogin();
-            }
-
-            // Verificar e solicitar permissão de microfone
-            const hasMicPermission = await checkMicrophonePermission();
-            if (!hasMicPermission) {
-              setTimeout(async () => {
-                Alert.alert(
-                  '🎤 Permissão de Microfone',
-                  'Para usar as funcionalidades de voz (criar tarefas e filtrar por voz), precisamos de acesso ao microfone.\n\nDeseja ativar esta funcionalidade?',
-                  [
-                    {
-                      text: 'Agora não',
-                      style: 'cancel',
-                      onPress: () => console.log('ℹ️ Usuário optou por não ativar microfone')
-                    },
-                    {
-                      text: 'Ativar',
-                      onPress: async () => {
-                        const granted = await requestMicrophonePermission();
-                        if (granted) {
-                          Alert.alert(
-                            '✅ Microfone Ativado',
-                            'Agora você pode usar as funcionalidades de voz para criar e filtrar tarefas!',
-                            [{ text: 'Perfeito!', style: 'default' }]
-                          );
-                        } else {
-                          Alert.alert(
-                            'ℹ️ Permissão Necessária',
-                            'Sem acesso ao microfone, não será possível usar as funcionalidades de voz. Deseja abrir as configurações para habilitar?',
-                            [
-                              { text: 'Agora não', style: 'cancel' },
-                              {
-                                text: 'Abrir Configurações',
-                                onPress: () => Linking.openSettings()
-                              }
-                            ]
-                          );
-                        }
-                      }
-                    }
-                  ]
-                );
-              }, 1500);
-            }
-
-            // Verificar e solicitar permissões de calendário
-            const hasCalendarPermissions = await checkCalendarPermissions();
-            if (!hasCalendarPermissions) {
-              setTimeout(async () => {
-                Alert.alert(
-                  '📅 Permissões de Calendário',
-                  'Para sincronizar tarefas com seu calendário e criar lembretes automáticos, precisamos de acesso ao calendário.\n\nDeseja ativar esta funcionalidade?',
-                  [
-                    {
-                      text: 'Agora não',
-                      style: 'cancel',
-                      onPress: () => console.log('ℹ️ Usuário optou por não ativar calendário')
-                    },
-                    {
-                      text: 'Ativar',
-                      onPress: async () => {
-                        const granted = await requestCalendarPermissions();
-                        if (granted) {
-                          Alert.alert(
-                            '✅ Calendário Ativado',
-                            'Suas tarefas serão sincronizadas automaticamente com o calendário e você receberá lembretes!',
-                            [{ text: 'Perfeito!', style: 'default' }]
-                          );
-                        } else {
-                          Alert.alert(
-                            'ℹ️ Permissão Necessária',
-                            'Sem acesso ao calendário, não será possível sincronizar tarefas. Deseja abrir as configurações para habilitar?',
-                            [
-                              { text: 'Agora não', style: 'cancel' },
-                              {
-                                text: 'Abrir Configurações',
-                                onPress: () => Linking.openSettings()
-                              }
-                            ]
-                          );
-                        }
-                      }
-                    }
-                  ]
-                );
-              }, 2000);
-            }
-
-            // Verificar e solicitar permissões de arquivos
-            const hasFilePermissions = await checkFilePermissions();
-            if (!hasFilePermissions) {
-              setTimeout(async () => {
-                Alert.alert(
-                  '📁 Permissão de Arquivos',
-                  'Para anexar documentos às suas tarefas, precisamos de acesso aos arquivos do dispositivo.\n\nDeseja ativar esta funcionalidade?',
-                  [
-                    {
-                      text: 'Agora não',
-                      style: 'cancel',
-                      onPress: () => console.log('ℹ️ Usuário optou por não ativar arquivos')
-                    },
-                    {
-                      text: 'Ativar',
-                      onPress: async () => {
-                        await requestFilePermissions();
-                      }
-                    }
-                  ]
-                );
-              }, 3000);
-            }
-
-            // Solicitar permissão de notificação
-            setTimeout(async () => {
-              await checkPermission();
-              if (!permissionStatus?.enabled) {
-                Alert.alert(
-                  '🔔 Permissão de Notificações',
-                  'Para receber lembretes sobre suas tarefas (prazos próximos, novas tarefas criadas), precisamos de permissão para enviar notificações.\n\nDeseja ativar as notificações?',
-                  [
-                    {
-                      text: 'Agora não',
-                      style: 'cancel',
-                      onPress: () => console.log('ℹ️ Usuário optou por não ativar notificações')
-                    },
-                    {
-                      text: 'Ativar',
-                      onPress: async () => {
-                        await requestPermission();
-                        console.log('🔔 Configurações de notificação abertas');
-                      }
-                    }
-                  ]
-                );
-              }
-            }, 4000); // Delay para não sobrecarregar o usuário com muitos dialogs
+            await GoogleCalendarService.initializeAfterLogin();
+            
+            // Iniciar fila de permissões após inicialização
+            setTimeout(() => {
+              processPermissionQueue();
+            }, 1000);
           } catch (error) {
             console.log('Usuário optou por não conceder algumas permissões');
           }
